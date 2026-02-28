@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    /*
+      --sat  : насыщенность (1 = чистый цвет, 0 = полностью серый)
+      --br   : яркость (для тёмной = множитель от 0.4 до 1, для светлой то же)
+      Слайдер меняет --sat
+    */
+    :root {
+      --sat: 1;
+      --bg:         hsl(0,0%,4%);
+      --bg2:        hsl(0,0%,7%);
+      --bg3:        hsl(0,0%,10%);
+      --text:       hsl(0,0%,96%);
+      --silver:     hsl(0,0%,72%);
+      --silver-hi:  hsl(0,0%,88%);
+      --silver-lo:  rgba(180,180,180,0.32);
+      --dim:        rgba(200,200,200,0.28);
+      --dim2:       rgba(200,200,200,0.13);
+      --border:     rgba(255,255,255,0.07);
+      --border2:    rgba(255,255,255,0.13);
+      --chart-grid: rgba(255,255,255,0.04);
+      --surface-sat: calc(4% + (10% - 4%) * (1 - var(--sat)));
+      --green:  #7fff9e;
+      --yellow: #ffd97a;
+      --red:    #ff6b6b;
+    }
+
+    /* Тёмная + серость: sat=0 → bg становится серым ~28% */
+    [data-theme="dark"] {
+      --bg:        hsl(0,0%,calc(4% + 24% * (1 - var(--sat))));
+      --bg2:       hsl(0,0%,calc(7% + 21% * (1 - var(--sat))));
+      --bg3:       hsl(0,0%,calc(10% + 18% * (1 - var(--sat))));
+      --text:      hsl(0,0%,calc(96% - 12% * (1 - var(--sat))));
+      --silver:    hsl(0,0%,calc(72% - 8%  * (1 - var(--sat))));
+      --silver-hi: hsl(0,0%,calc(88% - 10% * (1 - var(--sat))));
+    }
+
+    /* Светлая + серость: sat=0 → bg становится серым ~55% */
+    [data-theme="light"] {
+      --bg:        hsl(0,0%,calc(96% - 40% * (1 - var(--sat))));
+      --bg2:       hsl(0,0%,calc(91% - 38% * (1 - var(--sat))));
+      --bg3:       hsl(0,0%,calc(86% - 35% * (1 - var(--sat))));
+      --text:      hsl(0,0%,calc(10% + 10% * (1 - var(--sat))));
+      --silver:    hsl(0,0%,calc(34% + 15% * (1 - var(--sat))));
+      --silver-hi: hsl(0,0%,calc(14% + 20% * (1 - var(--sat))));
+      --silver-lo: rgba(80,80,80,0.35);
+      --dim:       rgba(0,0,0,0.32);
+      --dim2:      rgba(0,0,0,0.14);
+      --border:    rgba(0,0,0,0.08);
+      --border2:   rgba(0,0,0,0.14);
+      --chart-grid:rgba(0,0,0,0.05);
+      --green:  #1a9e47;
+      --yellow: #b87a00;
+      --red:    #cc2828;
+    }
+
+    html, body { height:100%; }
+    body {
+      font-family:'Montserrat',sans-serif;
+      background:var(--bg); color:var(--silver);
+      min-height:100vh; overflow-x:hidden;
+      transition:background .25s, color .25s;
+    }
+
+    /* ══ ЗАСТАВКА ══ */
+    #splash {
+      position:fixed; inset:0; background:var(--bg);
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      z-index:1000; cursor:pointer;
+      transition:opacity .55s ease, background .25s;
+    }
+    #splash.hide { opacity:0; pointer-events:none; }
+    .splash-logo {
+      position:relative; width:130px; height:130px;
+      display:flex; align-items:center; justify-content:center;
+      margin-bottom:28px; animation:logo-in .9s ease both;
+    }
+    @keyframes logo-in { from{opacity:0;transform:scale(.82)} to{opacity:1;transform:scale(1)} }
+    .s-ring { position:absolute; border-radius:50%; border:1.5px solid var(--silver-lo); }
+    .s-ring-1 { width:120px; height:120px; animation:spin1 9s linear infinite; }
+    .s-ring-2 { width:132px; height:34px; transform:rotate(-22deg); animation:spin2 7s linear infinite reverse; }
+    .s-ring-3 { width:112px; height:26px; transform:rotate(14deg); animation:spin2 11s linear infinite; }
+    @keyframes spin1 { to{transform:rotate(360deg)} }
+    @keyframes spin2 { from{transform:rotate(-22deg)} to{transform:rotate(338deg)} }
+    .s-dot { width:6px; height:6px; border-radius:50%; background:var(--silver-lo); }
+    .s-wordmark { font-family:'Cormorant Garamond',serif; font-size:50px; font-weight:300; letter-spacing:18px; text-indent:18px; color:var(--silver-hi); animation:logo-in 1.1s ease both; }
+    .s-sub { font-size:8px; letter-spacing:4px; text-transform:uppercase; color:var(--dim); margin-top:6px; animation:logo-in 1.3s ease both; }
+    .s-hint { position:absolute; bottom:44px; font-size:8px; letter-spacing:3px; text-transform:uppercase; color:var(--dim2); animation:hint 2.2s infinite 1.8s; }
+    @keyframes hint { 0%,100%{opacity:.15} 50%{opacity:.5} }
+
+    /* ══ APP ══ */
+    #app { max-width:430px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; opacity:0; transition:opacity .45s ease; }
+    #app.visible { opacity:1; }
+
+    /* ШАПКА */
+    .header {
+      padding:20px 18px 16px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:10; background:var(--bg);
+      backdrop-filter:blur(18px); transition:background .25s, border-color .25s;
+    }
+    .logo-btn { display:flex; align-items:center; gap:11px; cursor:pointer; user-select:none; }
+    .logo-mini { position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
+    .lm-ring  { position:absolute; width:26px; height:26px; border-radius:50%; border:1px solid var(--silver-lo); }
+    .lm-orbit { position:absolute; width:32px; height:9px; border-radius:50%; border:1px solid var(--silver-lo); transform:rotate(-20deg); }
+    .lm-dot   { width:3px; height:3px; border-radius:50%; background:var(--silver-lo); }
+    .logo-word { font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:600; letter-spacing:5px; text-indent:5px; color:var(--silver-hi); }
+    .header-right { display:flex; align-items:center; gap:12px; }
+    .live-ind { display:flex; align-items:center; gap:5px; font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+    .live-dot { width:5px; height:5px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .settings-btn { width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; color:var(--dim); border:1px solid var(--border); border-radius:4px; transition:color .2s, border-color .2s; }
+    .settings-btn:hover { color:var(--silver); border-color:var(--border2); }
+
+    /* ПАНЕЛЬ НАСТРОЕК */
+    .theme-panel { background:var(--bg2); border-bottom:1px solid var(--border); padding:0 18px; max-height:0; overflow:hidden; transition:max-height .35s ease, padding .35s ease, background .25s; }
+    .theme-panel.open { max-height:140px; padding:16px 18px; }
+    .tp-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .tp-label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+    .toggle-wrap { display:flex; align-items:center; gap:8px; }
+    .tog-lbl { font-size:9px; color:var(--dim); letter-spacing:1px; }
+    .toggle { width:40px; height:22px; border-radius:11px; background:var(--bg3); border:1px solid var(--border2); position:relative; cursor:pointer; transition:all .3s; }
+    .toggle-knob { position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:var(--silver-lo); transition:transform .3s, background .3s; }
+    [data-theme="light"] .toggle-knob { transform:translateX(18px); background:var(--silver); }
+    .sat-row { display:flex; align-items:center; gap:10px; }
+    .sat-icon { font-size:11px; color:var(--dim); user-select:none; }
+    input[type=range].sat-slider { flex:1; -webkit-appearance:none; appearance:none; height:2px; background:var(--border2); border-radius:1px; outline:none; cursor:pointer; }
+    input[type=range].sat-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--silver); cursor:pointer; }
+    input[type=range].sat-slider::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:var(--silver); cursor:pointer; border:none; }
+    .sat-val { font-size:9px; color:var(--dim); letter-spacing:1px; min-width:28px; text-align:right; }
+
+    /* ВКЛАДКИ */
+    .tabs { display:flex; border-bottom:1px solid var(--border); background:var(--bg); transition:background .25s, border-color .25s; }
+    .tab { flex:1; padding:12px 4px; text-align:center; font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); cursor:pointer; font-weight:500; border-bottom:1px solid transparent; margin-bottom:-1px; transition:all .2s; }
+    .tab.active { color:var(--silver-hi); border-bottom-color:var(--silver); }
+
+    /* СТРАНИЦЫ */
+    .page { display:none; padding:20px 18px 60px; animation:reveal .3s ease both; }
+    .page.active { display:block; }
+    @keyframes reveal { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ОБЩИЕ ЭЛЕМЕНТЫ */
+    .page-hdr { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; }
+    .section-title { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:400; color:var(--text); letter-spacing:.5px; }
+    .upd-time { font-size:9px; color:var(--dim); letter-spacing:1px; }
+    .divider { height:1px; background:var(--border); margin:20px 0; }
+
+    /* ════ ОБЗОР ════ */
+    .home-hero { padding:26px 0 22px; border-bottom:1px solid var(--border); margin-bottom:20px; }
+    .eyebrow { font-size:8px; letter-spacing:4px; text-transform:uppercase; color:var(--dim); margin-bottom:10px; }
+    .home-title { font-family:'Cormorant Garamond',serif; font-size:38px; font-weight:300; color:var(--text); letter-spacing:-1px; line-height:1.1; margin-bottom:12px; }
+    .home-title span { color:var(--dim); }
+    .home-desc { font-size:11px; line-height:1.9; color:var(--dim); font-weight:300; max-width:300px; }
+    .robot-tag { display:inline-flex; align-items:center; gap:8px; margin-top:16px; padding:6px 12px; border:1px solid var(--border2); font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--silver); }
+    .rtag-dot { width:5px; height:5px; border-radius:50%; background:var(--green); box-shadow:0 0 5px var(--green); }
+
+    /* Нормы показателей */
+    .norms-title { font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--dim); margin-bottom:14px; }
+    .norm-row { display:flex; align-items:flex-start; padding:12px 0; border-bottom:1px solid var(--border); gap:14px; }
+    .norm-indicator { width:4px; border-radius:2px; flex-shrink:0; margin-top:3px; }
+    .norm-indicator.ok     { background:var(--green); height:36px; }
+    .norm-indicator.warn   { background:var(--yellow); height:36px; }
+    .norm-indicator.danger { background:var(--red); height:36px; }
+    .norm-sensor { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); margin-bottom:4px; }
+    .norm-range  { font-family:'Cormorant Garamond',serif; font-size:16px; font-weight:300; color:var(--text); }
+    .norm-desc   { font-size:9px; color:var(--dim); margin-top:2px; line-height:1.5; }
+
+    /* Экстренные службы */
+    .emergency-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px; }
+    .emg-card { background:var(--bg2); border:1px solid var(--border); padding:13px; transition:background .25s; }
+    .emg-num  { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:300; color:var(--text); letter-spacing:-1px; }
+    .emg-name { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); margin-top:3px; }
+    .emg-card a { text-decoration:none; display:flex; flex-direction:column; }
+
+    /* ════ ДАТЧИКИ ════ */
+    .alert-panel { display:none; border:1px solid rgba(255,107,107,.3); background:rgba(255,107,107,.05); margin-bottom:14px; overflow:hidden; }
+    .alert-panel.visible { display:block; }
+    .alert-msg  { padding:11px 14px; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--red); line-height:1.5; }
+    .alert-calls { border-top:1px solid rgba(255,107,107,.15); display:flex; flex-wrap:wrap; }
+    .call-btn { flex:1; min-width:80px; padding:10px 12px; display:flex; flex-direction:column; cursor:pointer; border-right:1px solid rgba(255,107,107,.1); transition:background .2s; text-decoration:none; }
+    .call-btn:last-child { border-right:none; }
+    .call-btn:hover { background:rgba(255,107,107,.08); }
+    .call-num  { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:600; color:var(--red); letter-spacing:-.5px; }
+    .call-name { font-size:8px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
+
+    .sensors-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .scard { background:var(--bg2); border:1px solid var(--border); padding:17px 13px; transition:border-color .4s, background .25s; animation:reveal .4s ease both; }
+    .scard.danger { border-color:rgba(255,107,107,.38); }
+    .scard.warn   { border-color:rgba(255,217,122,.28); }
+    .scard-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+    .scard-id  { font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+    .scard-dot { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 7px var(--green); transition:all .4s; }
+    .scard-dot.warn  { background:var(--yellow); box-shadow:0 0 7px var(--yellow); }
+    .scard-dot.alert { background:var(--red); box-shadow:0 0 7px var(--red); animation:blink .8s infinite; }
+    .scard-value { font-family:'Cormorant Garamond',serif; font-size:34px; font-weight:300; color:var(--text); line-height:1; letter-spacing:-1px; transition:color .4s; }
+    .scard-value.warn  { color:var(--yellow); }
+    .scard-value.alert { color:var(--red); }
+    .scard-unit { font-size:8px; color:var(--dim); letter-spacing:1px; margin-top:3px; }
+    .scard-bar  { height:1px; background:var(--border); margin-top:10px; position:relative; overflow:hidden; }
+    .scard-bar-fill { position:absolute; top:0; left:0; height:100%; background:var(--silver-lo); transition:width .9s cubic-bezier(.4,0,.2,1), background .4s; }
+    .scard-bar-fill.warn  { background:rgba(255,217,122,.5); }
+    .scard-bar-fill.alert { background:rgba(255,107,107,.6); }
+
+    /* Советы по дому */
+    .tips-title { font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--dim); margin-bottom:12px; margin-top:22px; }
+    .tip-row { display:flex; gap:12px; align-items:flex-start; padding:11px 0; border-bottom:1px solid var(--border); }
+    .tip-mark { width:4px; height:4px; border-radius:50%; background:var(--silver-lo); flex-shrink:0; margin-top:6px; }
+    .tip-text { font-size:10px; line-height:1.7; color:var(--dim); }
+    .tip-text strong { color:var(--silver); font-weight:500; }
+
+    /* ════ ГРАФИКИ ════ */
+    .chart-card { background:var(--bg2); border:1px solid var(--border); padding:15px 13px; margin-bottom:10px; transition:background .25s, border-color .25s; }
+    .chart-hdr  { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .chart-lbl  { font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+    .chart-cur  { font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:300; color:var(--text); letter-spacing:-.5px; }
+    .chart-status-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .chart-status {
+      font-size:8px; letter-spacing:1.5px; text-transform:uppercase;
+      padding:3px 8px; border-radius:2px;
+      cursor:pointer; transition:all .2s; user-select:none;
+    }
+    .chart-status.ok     { color:var(--green);  border:1px solid rgba(127,255,158,.25); }
+    .chart-status.warn   { color:var(--yellow); border:1px solid rgba(255,217,122,.25); }
+    .chart-status.danger { color:var(--red);    border:1px solid rgba(255,107,107,.25); animation:blink .8s infinite; }
+    .chart-deriv { font-size:8px; color:var(--dim); margin-left:auto; }
+    .chart-wrap { position:relative; height:60px; }
+    canvas.chart { width:100%; height:60px; display:block; }
+
+    /* Инструкция (popup) */
+    .instr-overlay {
+      display:none; position:fixed; inset:0;
+      background:rgba(0,0,0,0.7); z-index:200;
+      align-items:flex-end; justify-content:center;
+    }
+    .instr-overlay.show { display:flex; }
+    .instr-box {
+      background:var(--bg2); border:1px solid var(--border2);
+      border-bottom:none;
+      width:100%; max-width:430px;
+      padding:24px 20px 36px;
+      animation:slide-up .3s ease;
+    }
+    @keyframes slide-up { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .instr-close { float:right; font-size:16px; color:var(--dim); cursor:pointer; line-height:1; }
+    .instr-title { font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:400; color:var(--text); margin-bottom:14px; }
+    .instr-step { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+    .instr-n { font-family:'Cormorant Garamond',serif; font-size:20px; color:var(--dim); flex-shrink:0; line-height:1.2; }
+    .instr-t { font-size:10px; line-height:1.7; color:var(--silver); }
+    .instr-t strong { color:var(--text); }
+
+    /* ════ РАДАР ════ */
+    .map-card { background:var(--bg2); border:1px solid var(--border); padding:15px; margin-bottom:10px; transition:background .25s, border-color .25s; }
+    .map-top  { display:flex; justify-content:space-between; align-items:center; margin-bottom:13px; }
+    .map-lbl  { font-size:8px; letter-spacing:2.5px; text-transform:uppercase; color:var(--dim); }
+    .sonar-container { position:relative; width:100%; padding-bottom:100%; }
+    canvas#sonar { position:absolute; inset:0; width:100%; height:100%; }
+    .map-legend { display:flex; gap:16px; margin-top:10px; flex-wrap:wrap; }
+    .legend-item { display:flex; align-items:center; gap:6px; font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); }
+    .legend-line { width:13px; height:1px; }
+    .map-stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+    .stat-row  { border:1px solid var(--border); padding:10px 12px; transition:border-color .25s; }
+    .stat-lbl  { font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:4px; }
+    .stat-val  { font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:300; color:var(--text); letter-spacing:-.5px; }
+  </style>
+</head>
+<body>
+
+<!-- ЗАСТАВКА -->
+<div id="splash" onclick="enterApp()">
+  <div class="splash-logo">
+    <div class="s-ring s-ring-1"></div>
+    <div class="s-ring s-ring-2"></div>
+    <div class="s-ring s-ring-3"></div>
+    <div class="s-dot"></div>
+  </div>
+  <div class="s-wordmark">AIRO</div>
+  <div class="s-sub">Frankenstein 1.0 — Домашний страж</div>
+  <div class="s-hint">нажмите чтобы войти</div>
+</div>
+
+<!-- ИНСТРУКЦИЯ POPUP -->
+<div class="instr-overlay" id="instr-overlay" onclick="closeInstr(event)">
+  <div class="instr-box" id="instr-box">
+    <div class="instr-close" onclick="closeInstr()">✕</div>
+    <div class="instr-title" id="instr-title">Что делать</div>
+    <div id="instr-steps"></div>
+  </div>
+</div>
+
+<!-- ПРИЛОЖЕНИЕ -->
+<div id="app">
+
+  <div class="header">
+    <div class="logo-btn" onclick="goSplash()">
+      <div class="logo-mini"><div class="lm-ring"></div><div class="lm-orbit"></div><div class="lm-dot"></div></div>
+      <div class="logo-word">AIRO</div>
+    </div>
+    <div class="header-right">
+      <div class="live-ind"><div class="live-dot"></div>Онлайн</div>
+      <div class="settings-btn" onclick="toggleSettings()">⚙</div>
+    </div>
+  </div>
+
+  <!-- ПАНЕЛЬ НАСТРОЕК -->
+  <div class="theme-panel" id="theme-panel">
+    <div class="tp-row">
+      <span class="tp-label">Тема</span>
+      <div class="toggle-wrap">
+        <span class="tog-lbl" id="theme-label">Тёмная</span>
+        <div class="toggle" onclick="toggleTheme()"><div class="toggle-knob"></div></div>
+      </div>
+    </div>
+    <div class="sat-row">
+      <span class="tp-label">Серость</span>
+      <div style="flex:1;display:flex;align-items:center;gap:10px;margin-left:12px;">
+        <span class="sat-icon">◑</span>
+        <input type="range" class="sat-slider" id="sat-slider" min="0" max="100" value="100" oninput="setSat(this.value)">
+        <span class="sat-icon">●</span>
+        <span class="sat-val" id="sat-val">100%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" id="tab-home"    onclick="setPage('home')">Обзор</div>
+    <div class="tab"        id="tab-sensors" onclick="setPage('sensors')">Датчики</div>
+    <div class="tab"        id="tab-charts"  onclick="setPage('charts')">Графики</div>
+    <div class="tab"        id="tab-map"     onclick="setPage('map')">Радар</div>
+  </div>
+
+  <!-- ════ ОБЗОР ════ -->
+  <div class="page active" id="page-home">
+    <div class="home-hero">
+      <div class="eyebrow">Frankenstein 1.0</div>
+      <div class="home-title">Умный<br><span>Дом</span>овой</div>
+      <div class="home-desc">Автономный робот-ассистент для мониторинга безопасности помещений в реальном времени.</div>
+      <div class="robot-tag"><div class="rtag-dot"></div>Устройство активно</div>
+    </div>
+
+    <!-- Нормы показателей -->
+    <div class="norms-title">Нормы показателей</div>
+
+    <div class="norm-row">
+      <div class="norm-indicator ok"></div>
+      <div>
+        <div class="norm-sensor">Метан · MQ-4</div>
+        <div class="norm-range">0 — 200 ppm</div>
+        <div class="norm-desc">Норма. Концентрация безопасна для жизни.</div>
+      </div>
+    </div>
+    <div class="norm-row">
+      <div class="norm-indicator warn"></div>
+      <div>
+        <div class="norm-sensor">Метан · MQ-4</div>
+        <div class="norm-range">200 — 600 ppm</div>
+        <div class="norm-desc">Внимание. Проветрите помещение, проверьте газовые приборы.</div>
+      </div>
+    </div>
+    <div class="norm-row">
+      <div class="norm-indicator danger"></div>
+      <div>
+        <div class="norm-sensor">Метан · MQ-4</div>
+        <div class="norm-range">600+ ppm</div>
+        <div class="norm-desc">Опасность. Немедленное проветривание и эвакуация.</div>
+      </div>
+    </div>
+
+    <div class="norm-row">
+      <div class="norm-indicator ok"></div>
+      <div>
+        <div class="norm-sensor">Угарный газ · MQ-7</div>
+        <div class="norm-range">0 — 50 ppm</div>
+        <div class="norm-desc">Норма. ПДК для жилых помещений.</div>
+      </div>
+    </div>
+    <div class="norm-row">
+      <div class="norm-indicator warn"></div>
+      <div>
+        <div class="norm-sensor">Угарный газ · MQ-7</div>
+        <div class="norm-range">50 — 300 ppm</div>
+        <div class="norm-desc">Внимание. Головная боль при длительном воздействии.</div>
+      </div>
+    </div>
+    <div class="norm-row">
+      <div class="norm-indicator danger"></div>
+      <div>
+        <div class="norm-sensor">Угарный газ · MQ-7</div>
+        <div class="norm-range">300+ ppm</div>
+        <div class="norm-desc">Опасность. Риск отравления. Срочно покиньте помещение.</div>
+      </div>
+    </div>
+
+    <div class="norm-row">
+      <div class="norm-indicator ok"></div>
+      <div>
+        <div class="norm-sensor">Температура · DHT22</div>
+        <div class="norm-range">18 — 25 °C</div>
+        <div class="norm-desc">Комфортный диапазон для жилых помещений.</div>
+      </div>
+    </div>
+    <div class="norm-row">
+      <div class="norm-indicator ok"></div>
+      <div>
+        <div class="norm-sensor">Влажность · DHT22</div>
+        <div class="norm-range">40 — 60 %</div>
+        <div class="norm-desc">Оптимальная влажность. Меньше плесени и аллергенов.</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Экстренные службы -->
+    <div class="norms-title">Экстренные службы</div>
+    <div class="emergency-grid">
+      <div class="emg-card"><a href="tel:101"><div class="emg-num">101</div><div class="emg-name">МЧС · Пожарные</div></a></div>
+      <div class="emg-card"><a href="tel:103"><div class="emg-num">103</div><div class="emg-name">Скорая помощь</div></a></div>
+      <div class="emg-card"><a href="tel:104"><div class="emg-num">104</div><div class="emg-name">Газовая служба</div></a></div>
+      <div class="emg-card"><a href="tel:112"><div class="emg-num">112</div><div class="emg-name">Единый · Все службы</div></a></div>
+    </div>
+  </div>
+
+  <!-- ════ ДАТЧИКИ ════ -->
+  <div class="page" id="page-sensors">
+    <div class="page-hdr">
+      <div class="section-title">Датчики</div>
+      <div class="upd-time" id="last-update">—</div>
+    </div>
+
+    <div class="alert-panel" id="alert-panel">
+      <div class="alert-msg" id="alert-msg"></div>
+      <div class="alert-calls" id="alert-calls"></div>
+    </div>
+
+    <div class="sensors-grid">
+      <div class="scard" id="card-mq4">
+        <div class="scard-top"><div class="scard-id">MQ-4</div><div class="scard-dot" id="dot-mq4"></div></div>
+        <div class="scard-value" id="val-mq4">—</div>
+        <div class="scard-unit">ppm</div>
+        <div class="scard-bar"><div class="scard-bar-fill" id="bar-mq4" style="width:0%"></div></div>
+      </div>
+      <div class="scard" id="card-mq7">
+        <div class="scard-top"><div class="scard-id">MQ-7</div><div class="scard-dot" id="dot-mq7"></div></div>
+        <div class="scard-value" id="val-mq7">—</div>
+        <div class="scard-unit">ppm</div>
+        <div class="scard-bar"><div class="scard-bar-fill" id="bar-mq7" style="width:0%"></div></div>
+      </div>
+      <div class="scard" id="card-temp">
+        <div class="scard-top"><div class="scard-id">DHT22</div><div class="scard-dot" id="dot-temp"></div></div>
+        <div class="scard-value" id="val-temp">—</div>
+        <div class="scard-unit">°C</div>
+        <div class="scard-bar"><div class="scard-bar-fill" id="bar-temp" style="width:0%"></div></div>
+      </div>
+      <div class="scard" id="card-hum">
+        <div class="scard-top"><div class="scard-id">DHT22</div><div class="scard-dot" id="dot-hum"></div></div>
+        <div class="scard-value" id="val-hum">—</div>
+        <div class="scard-unit">%</div>
+        <div class="scard-bar"><div class="scard-bar-fill" id="bar-hum" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- Советы -->
+    <div class="tips-title">Как поддерживать оптимальные условия</div>
+
+    <div class="tip-row"><div class="tip-mark"></div><div class="tip-text"><strong>Проветривайте дважды в день</strong> — утром и вечером по 10–15 минут. Это снижает уровень CO₂ и вредных примесей.</div></div>
+    <div class="tip-row"><div class="tip-mark"></div><div class="tip-text"><strong>Регулярно проверяйте газовые приборы</strong> — плита, котёл, колонка. Следите за синим цветом пламени: жёлтый или оранжевый — признак неполного сгорания.</div></div>
+    <div class="tip-row"><div class="tip-mark"></div><div class="tip-text"><strong>Поддерживайте влажность 40–60%</strong> — при сухом воздухе используйте увлажнитель, при слишком влажном — вентиляцию или осушитель.</div></div>
+    <div class="tip-row"><div class="tip-mark"></div><div class="tip-text"><strong>Не оставляйте работающие двигатели</strong> в закрытом гараже — автомобиль и газонокосилка выделяют угарный газ даже при короткой работе.</div></div>
+    <div class="tip-row"><div class="tip-mark"></div><div class="tip-text"><strong>Устанавливайте оптимальную температуру</strong> 18–22°C для сна и 22–25°C для дневной активности. Перегрев ухудшает качество воздуха.</div></div>
+    <div class="tip-row"><div class="tip-mark"></div><div class="tip-text"><strong>Проверяйте вентиляцию</strong> — поднесите лист бумаги к вентиляционной решётке: должен притягиваться. Засорённая вентиляция — главная причина накопления CO.</div></div>
+  </div>
+
+  <!-- ════ ГРАФИКИ ════ -->
+  <div class="page" id="page-charts">
+    <div class="page-hdr"><div class="section-title">Графики</div><div class="upd-time">24 часа</div></div>
+
+    <div class="chart-card">
+      <div class="chart-hdr">
+        <div class="chart-lbl">Метан · ppm</div>
+        <div class="chart-cur" id="cur-mq4">—</div>
+      </div>
+      <div class="chart-status-row">
+        <div class="chart-status ok" id="st-mq4" onclick="showInstr('mq4', this)">Всё хорошо</div>
+        <div class="chart-deriv" id="deriv-mq4">Δ —</div>
+      </div>
+      <div class="chart-wrap"><canvas class="chart" id="ch-mq4"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-hdr">
+        <div class="chart-lbl">Угарный газ · ppm</div>
+        <div class="chart-cur" id="cur-mq7">—</div>
+      </div>
+      <div class="chart-status-row">
+        <div class="chart-status ok" id="st-mq7" onclick="showInstr('mq7', this)">Всё хорошо</div>
+        <div class="chart-deriv" id="deriv-mq7">Δ —</div>
+      </div>
+      <div class="chart-wrap"><canvas class="chart" id="ch-mq7"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-hdr">
+        <div class="chart-lbl">Температура · °C</div>
+        <div class="chart-cur" id="cur-temp">—</div>
+      </div>
+      <div class="chart-status-row">
+        <div class="chart-status ok" id="st-temp" onclick="showInstr('temp', this)">Всё хорошо</div>
+        <div class="chart-deriv" id="deriv-temp">Δ —</div>
+      </div>
+      <div class="chart-wrap"><canvas class="chart" id="ch-temp"></canvas></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-hdr">
+        <div class="chart-lbl">Влажность · %</div>
+        <div class="chart-cur" id="cur-hum">—</div>
+      </div>
+      <div class="chart-status-row">
+        <div class="chart-status ok" id="st-hum" onclick="showInstr('hum', this)">Всё хорошо</div>
+        <div class="chart-deriv" id="deriv-hum">Δ —</div>
+      </div>
+      <div class="chart-wrap"><canvas class="chart" id="ch-hum"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ════ РАДАР ════ -->
+  <div class="page" id="page-map">
+    <div class="page-hdr"><div class="section-title">Радар</div><div class="upd-time">HC-SR04</div></div>
+    <div class="map-card">
+      <div class="map-top">
+        <div class="map-lbl">Ультразвуковое сканирование</div>
+        <div class="live-ind"><div class="live-dot"></div>Активен</div>
+      </div>
+      <div class="sonar-container"><canvas id="sonar"></canvas></div>
+      <div class="map-legend">
+        <div class="legend-item"><div class="legend-line" style="background:var(--silver-lo)"></div>Луч</div>
+        <div class="legend-item"><div class="legend-line" style="background:var(--red)"></div>Препятствие</div>
+        <div class="legend-item"><div class="legend-line" style="background:var(--green)"></div>Свободно</div>
+      </div>
+    </div>
+    <div class="map-stats">
+      <div class="stat-row"><div class="stat-lbl">Дистанция</div><div class="stat-val" id="us-dist">— см</div></div>
+      <div class="stat-row"><div class="stat-lbl">Угол</div><div class="stat-val" id="us-angle">—°</div></div>
+      <div class="stat-row"><div class="stat-lbl">Радиус</div><div class="stat-val">400 см</div></div>
+      <div class="stat-row"><div class="stat-lbl">Интервал</div><div class="stat-val">100 мс</div></div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ════ ТЕМА И СЕРОСТЬ ════
+let isDark = true;
+let saturation = 100;
+
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  document.documentElement.style.setProperty('--sat', saturation / 100);
+  document.getElementById('theme-label').textContent = isDark ? 'Тёмная' : 'Светлая';
+  document.getElementById('sat-val').textContent = saturation + '%';
+  redrawAllCharts();
+}
+
+function toggleTheme() {
+  isDark = !isDark;
+  localStorage.setItem('airo-theme', isDark ? 'dark' : 'light');
+  applyTheme();
+}
+
+function setSat(val) {
+  saturation = parseInt(val);
+  localStorage.setItem('airo-sat', val);
+  applyTheme();
+}
+
+function toggleSettings() {
+  document.getElementById('theme-panel').classList.toggle('open');
+}
+
+// Восстановить сохранённое
+(function() {
+  const t   = localStorage.getItem('airo-theme');
+  const sat = localStorage.getItem('airo-sat');
+  if (t)   isDark = t === 'dark';
+  if (sat) { saturation = parseInt(sat); document.getElementById('sat-slider').value = sat; }
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  document.documentElement.style.setProperty('--sat', saturation / 100);
+  document.getElementById('theme-label').textContent = isDark ? 'Тёмная' : 'Светлая';
+  document.getElementById('sat-val').textContent = saturation + '%';
+})();
+
+// ════ ЗАСТАВКА ════
+function enterApp() {
+  document.getElementById('splash').classList.add('hide');
+  setTimeout(() => {
+    document.getElementById('splash').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+  }, 580);
+}
+function goSplash() {
+  document.getElementById('app').classList.remove('visible');
+  const s = document.getElementById('splash');
+  s.style.display = 'flex';
+  setTimeout(() => s.classList.remove('hide'), 10);
+}
+
+// ════ ВКЛАДКИ ════
+function setPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.getElementById('tab-'  + id).classList.add('active');
+  if (id === 'map')    initSonar();
+  if (id === 'charts') redrawAllCharts();
+}
+
+// ════ ИНСТРУКЦИИ ════
+const INSTRUCTIONS = {
+  mq4: {
+    ok: {
+      title: 'Метан — всё в норме',
+      steps: [
+        { n:'1', t:'Концентрация метана в пределах нормы. Специальных действий не требуется.' },
+        { n:'2', t:'Рекомендуется проветривать помещение дважды в день для поддержания качества воздуха.' },
+        { n:'3', t:'Периодически проверяйте газовые приборы на предмет утечек.' },
+      ]
+    },
+    warn: {
+      title: 'Метан — повышенный уровень',
+      steps: [
+        { n:'1', t:'<strong>Откройте окна и двери</strong> — проветрите помещение.' },
+        { n:'2', t:'<strong>Выключите газовые приборы</strong> — плиту, котёл, колонку.' },
+        { n:'3', t:'<strong>Проверьте запах газа</strong> — если запах есть, выйдите из помещения.' },
+        { n:'4', t:'Не включайте свет и электроприборы при сильном запахе газа.' },
+        { n:'5', t:'Если уровень не снижается — позвоните в газовую службу: <strong>104</strong>.' },
+      ]
+    },
+    danger: {
+      title: 'Метан — опасный уровень!',
+      steps: [
+        { n:'1', t:'<strong>Немедленно покиньте помещение</strong> — выведите всех людей.' },
+        { n:'2', t:'<strong>Не включайте свет</strong> и любые электроприборы — искра может вызвать взрыв.' },
+        { n:'3', t:'<strong>Не пользуйтесь лифтом.</strong> Спускайтесь по лестнице.' },
+        { n:'4', t:'Позвоните в газовую службу <strong>104</strong> и МЧС <strong>101</strong> с улицы.' },
+        { n:'5', t:'Не возвращайтесь до приезда специалистов.' },
+      ]
+    }
+  },
+  mq7: {
+    ok: {
+      title: 'Угарный газ — всё в норме',
+      steps: [
+        { n:'1', t:'Концентрация CO в пределах нормы. Воздух безопасен.' },
+        { n:'2', t:'Регулярно проверяйте вентиляцию — поднесите бумагу к решётке, должна притягиваться.' },
+        { n:'3', t:'Не оставляйте работающий автомобиль в закрытом гараже.' },
+      ]
+    },
+    warn: {
+      title: 'Угарный газ — внимание',
+      steps: [
+        { n:'1', t:'<strong>Проветрите помещение</strong> — откройте окна и двери.' },
+        { n:'2', t:'<strong>Найдите источник</strong> — котёл, колонка, автомобиль, печь.' },
+        { n:'3', t:'Выйдите на свежий воздух если почувствовали головную боль или слабость.' },
+        { n:'4', t:'Проверьте тягу в дымоходе и вентиляционных каналах.' },
+      ]
+    },
+    danger: {
+      title: 'Угарный газ — опасность!',
+      steps: [
+        { n:'1', t:'<strong>Срочно покиньте помещение</strong> — угарный газ не имеет запаха и цвета.' },
+        { n:'2', t:'<strong>Вызовите скорую помощь 103</strong> — даже при лёгком недомогании.' },
+        { n:'3', t:'Дышите свежим воздухом — наклонитесь ниже, горячий CO поднимается вверх.' },
+        { n:'4', t:'Позвоните в МЧС <strong>101</strong>. Не возвращайтесь в помещение.' },
+        { n:'5', t:'При потере сознания кого-либо — немедленно звоните <strong>112</strong>.' },
+      ]
+    }
+  },
+  temp: {
+    ok: {
+      title: 'Температура — норма',
+      steps: [
+        { n:'1', t:'Температура в комфортном диапазоне 18–25°C.' },
+        { n:'2', t:'Для сна оптимально 18–20°C. Для дневной активности 22–24°C.' },
+      ]
+    },
+    warn: {
+      title: 'Температура — отклонение',
+      steps: [
+        { n:'1', t:'Проверьте работу систем отопления или кондиционирования.' },
+        { n:'2', t:'При высокой температуре — проветрите помещение, используйте вентилятор.' },
+        { n:'3', t:'При низкой — проверьте батареи и окна на наличие сквозняков.' },
+      ]
+    },
+    danger: {
+      title: 'Температура — критическое значение',
+      steps: [
+        { n:'1', t:'<strong>Экстремальная жара</strong>: ищите прохладное место, пейте воду.' },
+        { n:'2', t:'<strong>Экстремальный холод</strong>: проверьте отопление, вызовите аварийную службу.' },
+        { n:'3', t:'При плохом самочувствии — позвоните в скорую <strong>103</strong>.' },
+      ]
+    }
+  },
+  hum: {
+    ok: {
+      title: 'Влажность — норма',
+      steps: [
+        { n:'1', t:'Влажность в диапазоне 40–60% — оптимально для здоровья и мебели.' },
+        { n:'2', t:'Поддерживайте этот уровень с помощью увлажнителя или вентиляции.' },
+      ]
+    },
+    warn: {
+      title: 'Влажность — требует внимания',
+      steps: [
+        { n:'1', t:'При высокой влажности — включите вентиляцию или осушитель воздуха.' },
+        { n:'2', t:'При низкой влажности — используйте увлажнитель или расставьте ёмкости с водой.' },
+        { n:'3', t:'Проверьте наличие плесени в углах комнат, ванной и под окнами.' },
+      ]
+    },
+    danger: {
+      title: 'Влажность — критический уровень',
+      steps: [
+        { n:'1', t:'<strong>Очень высокая</strong>: срочно проветрите, возможен рост плесени — угроза здоровью.' },
+        { n:'2', t:'<strong>Очень низкая</strong>: увлажняйте воздух, особенно актуально при простудах.' },
+        { n:'3', t:'Проверьте трубы на протечки при аномально высокой влажности.' },
+      ]
+    }
+  }
+};
+
+let currentSensor = null;
+let currentStatus = 'ok';
+
+function showInstr(sensor, el) {
+  if (!el) return;
+  const cls = el.className;
+  let status = 'ok';
+  if (cls.includes('danger')) status = 'danger';
+  else if (cls.includes('warn')) status = 'warn';
+
+  const data = INSTRUCTIONS[sensor]?.[status];
+  if (!data) return;
+
+  document.getElementById('instr-title').textContent = data.title;
+  document.getElementById('instr-steps').innerHTML = data.steps.map(s =>
+    `<div class="instr-step">
+      <div class="instr-n">${s.n}</div>
+      <div class="instr-t">${s.t}</div>
+    </div>`
+  ).join('');
+
+  document.getElementById('instr-overlay').classList.add('show');
+}
+
+function closeInstr(e) {
+  if (!e || e.target === document.getElementById('instr-overlay') || e.target.classList.contains('instr-close')) {
+    document.getElementById('instr-overlay').classList.remove('show');
+  }
+}
+
+// ════ ИСТОРИЯ ════
+const MAX_PTS = 288;
+const history = { mq4:[], mq7:[], temp:[], hum:[] };
+function pushHistory(key, val) {
+  history[key].push({ t: Date.now(), v: parseFloat(val) });
+  if (history[key].length > MAX_PTS) history[key].shift();
+}
+
+// ════ АЛЕРТ-ПЛАШКА ════
+const CALLS = {
+  mq4:  [{ num:'104', name:'Газовая служба' }, { num:'101', name:'МЧС' },            { num:'112', name:'Единый' }],
+  mq7:  [{ num:'103', name:'Скорая помощь'  }, { num:'101', name:'МЧС' },            { num:'112', name:'Единый' }],
+  both: [{ num:'104', name:'Газовая служба' }, { num:'103', name:'Скорая помощь' },  { num:'101', name:'МЧС' }, { num:'112', name:'Единый' }],
+};
+
+function updateAlertPanel(mq4Alert, mq7Alert) {
+  const panel   = document.getElementById('alert-panel');
+  const msgEl   = document.getElementById('alert-msg');
+  const callsEl = document.getElementById('alert-calls');
+  if (!mq4Alert && !mq7Alert) { panel.classList.remove('visible'); return; }
+  panel.classList.add('visible');
+  let msg, calls;
+  if (mq4Alert && mq7Alert) { msg = 'Опасный уровень метана и угарного газа. Позвоните:'; calls = CALLS.both; }
+  else if (mq4Alert)        { msg = 'Опасный уровень метана — утечка газа. Позвоните:';   calls = CALLS.mq4;  }
+  else                      { msg = 'Опасный уровень угарного газа. Позвоните:';           calls = CALLS.mq7;  }
+  msgEl.textContent = msg;
+  callsEl.innerHTML = calls.map(c =>
+    `<a class="call-btn" href="tel:${c.num}">
+      <div class="call-num">${c.num}</div>
+      <div class="call-name">${c.name}</div>
+    </a>`
+  ).join('');
+}
+
+// ════ ДАТЧИКИ ════
+function lvl(v, w, d) { return v >= d ? 'alert' : v >= w ? 'warn' : 'normal'; }
+
+function applyCard(id, value, max, warnT, dangerT) {
+  const l = lvl(value, warnT, dangerT);
+  document.getElementById('val-' + id).textContent = value;
+  document.getElementById('val-' + id).className   = 'scard-value' + (l==='normal'?'':' '+l);
+  document.getElementById('bar-' + id).style.width = Math.min(100,(value/max)*100).toFixed(1)+'%';
+  document.getElementById('bar-' + id).className   = 'scard-bar-fill' + (l==='normal'?'':' '+l);
+  document.getElementById('dot-' + id).className   = 'scard-dot' + (l==='normal'?'':' '+l);
+  document.getElementById('card-'+ id).className   = 'scard'+(l==='alert'?' danger':l==='warn'?' warn':'');
+  return l;
+}
+
+// Обновляем статус-бейдж на графике
+function updateChartStatus(id, level) {
+  const el = document.getElementById('st-' + id);
+  if (!el) return;
+  const labels = { normal:'Всё хорошо', warn:'Тревожно', alert:'Опасно' };
+  el.textContent  = labels[level] || 'Всё хорошо';
+  el.className    = 'chart-status ' + (level === 'normal' ? 'ok' : level === 'warn' ? 'warn' : 'danger');
+}
+
+async function loadSensors() {
+  let d;
+  try {
+    const r = await fetch('http://192.168.4.1/sensors');
+    d = await r.json();
+  } catch {
+    d = {
+      mq4:  Math.round(60  + Math.random()*50),
+      mq7:  Math.round(28  + Math.random()*30),
+      temp: parseFloat((20 + Math.random()*4).toFixed(1)),
+      hum:  parseFloat((44 + Math.random()*8).toFixed(1)),
+    };
+  }
+  ['mq4','mq7','temp','hum'].forEach(k => pushHistory(k, d[k]));
+
+  const l4   = applyCard('mq4',  d.mq4,  1000, 400, 600);
+  const l7   = applyCard('mq7',  d.mq7,   500, 200, 300);
+  const lt   = applyCard('temp', d.temp,   60,  35,  45);
+  const lh   = applyCard('hum',  d.hum,   100,  70,  85);
+
+  updateAlertPanel(l4==='alert', l7==='alert');
+  updateChartStatus('mq4',  l4);
+  updateChartStatus('mq7',  l7);
+  updateChartStatus('temp', lt);
+  updateChartStatus('hum',  lh);
+
+  const el = document.getElementById('last-update');
+  if (el) el.textContent = new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+  if (document.getElementById('page-charts').classList.contains('active')) redrawAllCharts();
+}
+
+setInterval(loadSensors, 2000);
+loadSensors();
+
+// ════ ГРАФИКИ ════
+function drawChart(canvasId, key, color, curId, derivId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const dpr  = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = rect.width * dpr;
+  canvas.height = 60 * dpr;
+  canvas.style.width  = rect.width + 'px';
+  canvas.style.height = '60px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 60;
+  const pts = history[key];
+  if (pts.length < 2) return;
+
+  const vals = pts.map(p => p.v);
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const rng  = maxV - minV || 1;
+
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim();
+  ctx.lineWidth = 1;
+  [0,1,2,3].forEach(i => { ctx.beginPath(); ctx.moveTo(0,(H/3)*i); ctx.lineTo(W,(H/3)*i); ctx.stroke(); });
+
+  ctx.beginPath();
+  pts.forEach((p,i) => {
+    const x=(i/(pts.length-1))*W, y=H-((p.v-minV)/rng)*(H-6)-3;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.stroke();
+
+  const lv=pts[pts.length-1], lx=W-1, ly=H-((lv.v-minV)/rng)*(H-6)-3;
+  ctx.lineTo(lx,H); ctx.lineTo(0,H); ctx.closePath();
+  const m=color.match(/\d+/g);
+  if(m){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,`rgba(${m[0]},${m[1]},${m[2]},0.12)`);
+    g.addColorStop(1,`rgba(${m[0]},${m[1]},${m[2]},0)`);
+    ctx.fillStyle=g; ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(lx,ly,2.5,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+
+  document.getElementById(curId).textContent = lv.v;
+
+  if (pts.length >= 3) {
+    const diff = (lv.v - pts[pts.length-3].v).toFixed(2);
+    const el = document.getElementById(derivId);
+    if (el) {
+      const sign = diff > 0 ? '+' : '';
+      const arrow = diff > 0.3 ? ' ↑' : diff < -0.3 ? ' ↓' : '';
+      el.textContent = `Δ ${sign}${diff}${arrow}`;
+      el.style.color = diff > 0.5 ? 'var(--red)' : diff < -0.5 ? 'var(--green)' : 'var(--dim)';
+    }
+  }
+}
+
+function redrawAllCharts() {
+  drawChart('ch-mq4',  'mq4',  'rgb(255,107,107)', 'cur-mq4',  'deriv-mq4');
+  drawChart('ch-mq7',  'mq7',  'rgb(255,167,80)',  'cur-mq7',  'deriv-mq7');
+  drawChart('ch-temp', 'temp', isDark?'rgb(255,217,122)':'rgb(150,100,0)', 'cur-temp','deriv-temp');
+  drawChart('ch-hum',  'hum',  isDark?'rgb(120,180,255)':'rgb(40,100,180)','cur-hum', 'deriv-hum');
+}
+
+// ════ РАДАР ════
+let sonarInit = false;
+const sonarPts = [];
+
+function initSonar() {
+  if (sonarInit) return;
+  sonarInit = true;
+  const canvas = document.getElementById('sonar');
+  const ctx = canvas.getContext('2d');
+  function resize() { const s=canvas.parentElement.offsetWidth; canvas.width=s; canvas.height=s; }
+  resize(); window.addEventListener('resize', resize);
+  for(let a=0;a<360;a+=8+Math.random()*5) {
+    const free=(a>55&&a<105)||(a>225&&a<265);
+    sonarPts.push({angle:a, dist:free?1.0:0.35+Math.random()*0.55});
+  }
+  let sw=0, sd=1;
+  function draw() {
+    requestAnimationFrame(draw);
+    const W=canvas.width,H=canvas.height,cx=W/2,cy=H/2,R=W/2-2;
+    ctx.clearRect(0,0,W,H);
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.fillStyle=isDark?'#0d0d0d':'#eeeae5';ctx.fill();
+    const gc=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
+    for(let i=1;i<=4;i++){ctx.beginPath();ctx.arc(cx,cy,R*(i/4),0,Math.PI*2);ctx.strokeStyle=gc;ctx.lineWidth=1;ctx.stroke();}
+    ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.strokeStyle=gc;ctx.stroke();
+    sw+=1.2*sd; if(sw>=360)sd=-1; if(sw<=0)sd=1;
+    const sr=(sw-90)*Math.PI/180;
+    for(let t=0;t<50;t++){
+      const a=sr-t*0.022*sd;
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,a,a+0.022);ctx.closePath();
+      ctx.fillStyle=`rgba(${isDark?'200,200,200':'80,80,80'},${(1-t/50)*(isDark?.1:.06)})`;ctx.fill();
+    }
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+R*Math.cos(sr),cy+R*Math.sin(sr));
+    ctx.strokeStyle=isDark?'rgba(200,200,200,0.7)':'rgba(80,80,80,0.7)';
+    ctx.lineWidth=1;ctx.shadowBlur=5;ctx.shadowColor=isDark?'rgba(200,200,200,0.4)':'rgba(80,80,80,0.3)';
+    ctx.stroke();ctx.shadowBlur=0;
+    sonarPts.forEach(p=>{
+      if(p.dist>=0.95)return;
+      const ang=(p.angle-90)*Math.PI/180,r=R*p.dist,x=cx+r*Math.cos(ang),y=cy+r*Math.sin(ang);
+      const b=Math.exp(-Math.abs(((p.angle-sw)%360+360)%360)/60);
+      ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,107,107,${0.2+b*0.8})`;ctx.shadowBlur=b*8;ctx.shadowColor='rgba(255,107,107,0.8)';ctx.fill();ctx.shadowBlur=0;
+    });
+    ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);
+    ctx.fillStyle=isDark?'rgba(200,200,200,0.9)':'rgba(80,80,80,0.9)';
+    ctx.shadowBlur=10;ctx.shadowColor=isDark?'rgba(200,200,200,0.7)':'rgba(80,80,80,0.5)';
+    ctx.fill();ctx.shadowBlur=0;
+    ctx.save();ctx.globalCompositeOperation='destination-in';
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.restore();
+    const cl=sonarPts.reduce((mn,p)=>p.dist<mn.dist?p:mn,{dist:1});
+    document.getElementById('us-dist').textContent=Math.round(cl.dist*400)+' см';
+    document.getElementById('us-angle').textContent=Math.round(sw)+'°';
+  }
+  draw();
+}
+</script>
+</body>
+</html>
