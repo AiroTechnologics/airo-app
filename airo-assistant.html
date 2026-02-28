@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #060b14;
+      --surface: #0c1422;
+      --surface2: #111d2e;
+      --border: rgba(0,210,255,0.08);
+      --cyan: #00d2ff;
+      --cyan-dim: rgba(0,210,255,0.15);
+      --cyan-glow: rgba(0,210,255,0.25);
+      --green: #00e5a0;
+      --green-glow: rgba(0,229,160,0.15);
+      --yellow: #f5c542;
+      --red: #ff3b5c;
+      --red-glow: rgba(255,59,92,0.2);
+      --text-dim: rgba(255,255,255,0.35);
+      --text-mid: rgba(255,255,255,0.6);
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: 'Space Mono', monospace;
+      background: var(--bg);
+      color: #fff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Grid BG ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(0,210,255,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,210,255,0.025) 1px, transparent 1px);
+      background-size: 36px 36px;
+      pointer-events: none; z-index: 0;
+    }
+
+    /* ─────────── LAYOUT ─────────── */
+    .app {
+      position: relative; z-index: 1;
+      max-width: 430px; margin: 0 auto;
+      display: flex; flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ─────────── SIDEBAR / DRAWER ─────────── */
+    .overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      backdrop-filter: blur(3px);
+    }
+    .overlay.open { display: block; }
+
+    .drawer {
+      position: fixed;
+      top: 0; left: -300px;
+      width: 280px; height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      z-index: 101;
+      transition: left 0.35s cubic-bezier(0.4,0,0.2,1);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .drawer.open { left: 0; }
+
+    .drawer-top {
+      padding: 32px 24px 24px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(0,210,255,0.05), transparent);
+    }
+
+    .airo-logo {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .airo-icon {
+      width: 46px; height: 46px;
+      background: linear-gradient(135deg, var(--cyan), #0066ff);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 0 24px rgba(0,102,255,0.4);
+      flex-shrink: 0;
+    }
+
+    .airo-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      background: linear-gradient(90deg, #fff, var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .airo-sub {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .airo-desc {
+      font-size: 11px;
+      color: var(--text-mid);
+      line-height: 1.7;
+    }
+
+    .robot-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,210,255,0.08);
+      border: 1px solid rgba(0,210,255,0.2);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 10px;
+      color: var(--cyan);
+      letter-spacing: 1px;
+      margin-top: 12px;
+    }
+
+    .drawer-nav {
+      padding: 20px 16px;
+      flex: 1;
+    }
+
+    .nav-label {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      padding: 0 8px;
+      margin-bottom: 8px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-mid);
+      transition: all 0.2s;
+      margin-bottom: 4px;
+      border: 1px solid transparent;
+    }
+
+    .nav-item:hover { background: rgba(255,255,255,0.04); }
+
+    .nav-item.active {
+      background: var(--cyan-dim);
+      border-color: rgba(0,210,255,0.2);
+      color: #fff;
+    }
+
+    .nav-item .nav-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px;
+      background: rgba(255,255,255,0.05);
+      flex-shrink: 0;
+    }
+
+    .nav-item.active .nav-icon {
+      background: var(--cyan-dim);
+    }
+
+    .drawer-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      font-size: 9px;
+      color: rgba(255,255,255,0.15);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    /* ─────────── TOP BAR ─────────── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      gap: 14px;
+      background: rgba(6,11,20,0.9);
+      backdrop-filter: blur(10px);
+      position: sticky; top: 0; z-index: 10;
+    }
+
+    .menu-btn {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 5px; cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    .menu-btn:hover { background: rgba(0,210,255,0.08); }
+    .menu-btn span {
+      display: block;
+      width: 16px; height: 1.5px;
+      background: rgba(255,255,255,0.6);
+      border-radius: 2px;
+      transition: all 0.2s;
+    }
+
+    .topbar-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      flex: 1;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 9px;
+      color: var(--green);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .live-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--green);
+      animation: blink 1.8s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+    /* ─────────── TAB BAR ─────────── */
+    .tabbar {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+    }
+
+    .tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 8px;
+      cursor: pointer;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .tab .tab-icon { font-size: 18px; }
+
+    .tab.active {
+      color: var(--cyan);
+      border-bottom-color: var(--cyan);
+    }
+
+    /* ─────────── PAGES ─────────── */
+    .page { display: none; padding: 20px 16px 40px; animation: fade-in 0.3s ease; }
+    .page.active { display: block; }
+    @keyframes fade-in { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ─────────── SENSOR CARDS ─────────── */
+    .sensors-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .scard {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px 16px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.4s, box-shadow 0.4s;
+      animation: card-in 0.5s ease both;
+    }
+
+    .scard:nth-child(1) { animation-delay: 0.05s; }
+    .scard:nth-child(2) { animation-delay: 0.1s; }
+    .scard:nth-child(3) { animation-delay: 0.15s; }
+    .scard:nth-child(4) { animation-delay: 0.2s; }
+
+    @keyframes card-in {
+      from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)}
+    }
+
+    .scard::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      opacity: 0.3;
+    }
+
+    .scard.danger {
+      border-color: rgba(255,59,92,0.4);
+      box-shadow: 0 0 30px var(--red-glow);
+      animation: card-in 0.5s ease both, danger-pulse 2s infinite;
+    }
+    @keyframes danger-pulse {
+      0%,100%{box-shadow:0 0 30px var(--red-glow)} 50%{box-shadow:0 0 50px rgba(255,59,92,0.35)}
+    }
+    .scard.danger::before { background: linear-gradient(90deg,transparent,var(--red),transparent); opacity:.6; }
+
+    .scard-icon { font-size: 22px; margin-bottom: 10px; }
+
+    .scard-name {
+      font-size: 9px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 2px;
+    }
+
+    .scard-formula {
+      font-size: 8px;
+      color: rgba(255,255,255,0.18);
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    .scard-value {
+      font-family: 'Syne', sans-serif;
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--green);
+      letter-spacing: -2px;
+      transition: color 0.4s;
+    }
+
+    .scard-value.warn  { color: var(--yellow); }
+    .scard-value.alert { color: var(--red); }
+
+    .scard-unit {
+      font-size: 9px;
+      color: var(--text-dim);
+      margin-top: 3px;
+      letter-spacing: 1px;
+    }
+
+    .scard-bar-wrap {
+      margin-top: 12px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 3px; height: 3px; overflow: hidden;
+    }
+
+    .scard-bar {
+      height: 100%;
+      border-radius: 3px;
+      background: var(--green);
+      transition: width 0.9s cubic-bezier(0.4,0,0.2,1), background 0.4s;
+    }
+    .scard-bar.warn  { background: var(--yellow); }
+    .scard-bar.alert { background: var(--red); }
+
+    .scard-status {
+      display: inline-block;
+      font-size: 8px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 20px;
+      margin-top: 8px;
+      background: var(--green-glow);
+      color: var(--green);
+      border: 1px solid rgba(0,229,160,0.2);
+      transition: all 0.3s;
+    }
+    .scard-status.warn  { background: rgba(245,197,66,.12); color: var(--yellow); border-color: rgba(245,197,66,.3); }
+    .scard-status.alert { background: var(--red-glow); color: var(--red); border-color: rgba(255,59,92,.3); }
+
+    /* Alert banner */
+    .alert-banner {
+      display: none;
+      background: linear-gradient(135deg,rgba(255,59,92,.12),rgba(255,59,92,.04));
+      border: 1px solid rgba(255,59,92,.3);
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 14px;
+      font-size: 11px;
+      color: var(--red);
+      letter-spacing: .5px;
+      animation: fade-in .3s ease;
+    }
+    .alert-banner.visible { display: flex; align-items: center; gap: 8px; }
+
+    .update-time {
+      text-align: center;
+      font-size: 9px;
+      color: rgba(255,255,255,0.15);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 16px;
+    }
+
+    /* ─────────── MAP PAGE ─────────── */
+    .map-container {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    .map-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .map-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .map-subtitle {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .sonar-wrap {
+      position: relative;
+      width: 100%;
+      padding-bottom: 100%;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+
+    canvas#sonar {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+    }
+
+    .map-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 10px;
+      color: var(--text-mid);
+    }
+
+    .legend-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .map-info {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-top: 14px;
+      font-size: 10px;
+      color: var(--text-mid);
+      line-height: 1.7;
+    }
+
+    .map-info strong { color: var(--cyan); }
+
+    .sensor-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-size: 10px;
+    }
+    .sensor-row:last-child { border-bottom: none; }
+    .sensor-row .sr-label { color: var(--text-dim); letter-spacing: .5px; }
+    .sensor-row .sr-val { color: var(--cyan); font-weight: 700; }
+
+    /* ─────────── HOME PAGE ─────────── */
+    .home-hero {
+      background: linear-gradient(135deg, rgba(0,210,255,0.08), rgba(0,102,255,0.06));
+      border: 1px solid rgba(0,210,255,0.12);
+      border-radius: 20px;
+      padding: 28px 24px;
+      margin-bottom: 16px;
+      position: relative;
+      overflow: hidden;
+      animation: card-in .5s ease both;
+    }
+
+    .home-hero::after {
+      content: '🤖';
+      position: absolute;
+      right: 20px; top: 20px;
+      font-size: 64px;
+      opacity: 0.12;
+    }
+
+    .home-hero h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      background: linear-gradient(90deg, #fff, var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    .home-hero p {
+      font-size: 11px;
+      color: var(--text-mid);
+      line-height: 1.8;
+      max-width: 260px;
+    }
+
+    .home-tags {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;
+    }
+
+    .tag {
+      background: rgba(0,210,255,0.08);
+      border: 1px solid rgba(0,210,255,0.15);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 9px;
+      color: var(--cyan);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .capabilities-title {
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      margin-top: 4px;
+    }
+
+    .cap-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      animation: card-in .5s ease both;
+    }
+
+    .cap-item:nth-child(1) { animation-delay: .1s; }
+    .cap-item:nth-child(2) { animation-delay: .15s; }
+    .cap-item:nth-child(3) { animation-delay: .2s; }
+
+    .cap-icon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      background: var(--cyan-dim);
+      flex-shrink: 0;
+    }
+
+    .cap-text strong {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .cap-text span {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+  </style>
+</head>
+<body>
+
+<div class="overlay" id="overlay" onclick="closeDrawer()"></div>
+
+<!-- ── DRAWER ── -->
+<div class="drawer" id="drawer">
+  <div class="drawer-top">
+    <div class="airo-logo">
+      <div class="airo-icon">🤖</div>
+      <div>
+        <div class="airo-title">AIRO</div>
+        <div class="airo-sub">AI Robot Assistant</div>
+      </div>
+    </div>
+    <p class="airo-desc">
+      Интеллектуальный ассистент для управления и мониторинга робота-машинки <strong>Frankenstein&nbsp;1.0</strong>.
+      Контроль сенсоров, картография помещений и навигация в реальном времени.
+    </p>
+    <div class="robot-badge">
+      ⚡ Frankenstein 1.0 · Active
+    </div>
+  </div>
+
+  <nav class="drawer-nav">
+    <div class="nav-label">Навигация</div>
+    <div class="nav-item active" onclick="setPage('home'); closeDrawer()">
+      <div class="nav-icon">🏠</div>
+      Главная
+    </div>
+    <div class="nav-item" onclick="setPage('sensors'); closeDrawer()">
+      <div class="nav-icon">📡</div>
+      Датчики
+    </div>
+    <div class="nav-item" onclick="setPage('map'); closeDrawer()">
+      <div class="nav-icon">🗺️</div>
+      Карта помещения
+    </div>
+  </nav>
+
+  <div class="drawer-footer">v1.0.0 · Frankenstein Series</div>
+</div>
+
+<!-- ── APP ── -->
+<div class="app">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="menu-btn" onclick="openDrawer()">
+      <span></span><span></span><span></span>
+    </div>
+    <div class="topbar-title" id="topbar-title">AIRO Assistant</div>
+    <div class="live-badge">LIVE</div>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tabbar">
+    <div class="tab active" onclick="setPage('home')" id="tab-home">
+      <span class="tab-icon">🏠</span>Главная
+    </div>
+    <div class="tab" onclick="setPage('sensors')" id="tab-sensors">
+      <span class="tab-icon">📡</span>Датчики
+    </div>
+    <div class="tab" onclick="setPage('map')" id="tab-map">
+      <span class="tab-icon">🗺️</span>Карта
+    </div>
+  </div>
+
+  <!-- ── HOME PAGE ── -->
+  <div class="page active" id="page-home">
+    <div class="home-hero">
+      <h2>Ассистент AIRO</h2>
+      <p>Система мониторинга и управления для вашего робота Frankenstein 1.0. Всё под контролем.</p>
+      <div class="home-tags">
+        <span class="tag">🔬 Метан</span>
+        <span class="tag">💨 CO₂</span>
+        <span class="tag">🌡 Темп.</span>
+        <span class="tag">💧 Влажность</span>
+        <span class="tag">🔊 Ультразвук</span>
+      </div>
+    </div>
+
+    <div class="capabilities-title">Возможности</div>
+
+    <div class="cap-item">
+      <div class="cap-icon">🛡️</div>
+      <div class="cap-text">
+        <strong>Безопасность помещения</strong>
+        <span>4 датчика: газ, CO₂, температура и влажность в реальном времени</span>
+      </div>
+    </div>
+    <div class="cap-item">
+      <div class="cap-icon">🔊</div>
+      <div class="cap-text">
+        <strong>Ультразвуковое картирование</strong>
+        <span>Frankenstein 1.0 строит карту помещения через отражение ультразвука</span>
+      </div>
+    </div>
+    <div class="cap-item">
+      <div class="cap-icon">🤖</div>
+      <div class="cap-text">
+        <strong>Автономная навигация</strong>
+        <span>Робот объезжает препятствия и передаёт данные на панель</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SENSORS PAGE ── -->
+  <div class="page" id="page-sensors">
+    <div class="alert-banner" id="alert-banner">⚠️ Превышение допустимого уровня!</div>
+    <div class="sensors-grid">
+
+      <div class="scard" id="card-mq4">
+        <div class="scard-icon">🔥</div>
+        <div class="scard-name">MQ-4</div>
+        <div class="scard-formula">Метан · CH₄</div>
+        <div class="scard-value" id="val-mq4">—</div>
+        <div class="scard-unit">ppm</div>
+        <div class="scard-bar-wrap"><div class="scard-bar" id="bar-mq4" style="width:0%"></div></div>
+        <div class="scard-status" id="st-mq4">Норма</div>
+      </div>
+
+      <div class="scard" id="card-mq135">
+        <div class="scard-icon">💨</div>
+        <div class="scard-name">MQ-135</div>
+        <div class="scard-formula">CO₂ / Воздух</div>
+        <div class="scard-value" id="val-mq135">—</div>
+        <div class="scard-unit">ppm</div>
+        <div class="scard-bar-wrap"><div class="scard-bar" id="bar-mq135" style="width:0%"></div></div>
+        <div class="scard-status" id="st-mq135">Норма</div>
+      </div>
+
+      <div class="scard" id="card-temp">
+        <div class="scard-icon">🌡️</div>
+        <div class="scard-name">DHT22</div>
+        <div class="scard-formula">Температура</div>
+        <div class="scard-value" id="val-temp">—</div>
+        <div class="scard-unit">°C</div>
+        <div class="scard-bar-wrap"><div class="scard-bar" id="bar-temp" style="width:0%"></div></div>
+        <div class="scard-status" id="st-temp">Норма</div>
+      </div>
+
+      <div class="scard" id="card-hum">
+        <div class="scard-icon">💧</div>
+        <div class="scard-name">DHT22</div>
+        <div class="scard-formula">Влажность</div>
+        <div class="scard-value" id="val-hum">—</div>
+        <div class="scard-unit">%</div>
+        <div class="scard-bar-wrap"><div class="scard-bar" id="bar-hum" style="width:0%"></div></div>
+        <div class="scard-status" id="st-hum">Норма</div>
+      </div>
+
+    </div>
+    <div class="update-time">Обновлено: <span id="last-update">—</span></div>
+  </div>
+
+  <!-- ── MAP PAGE ── -->
+  <div class="page" id="page-map">
+    <div class="map-container">
+      <div class="map-header">
+        <div>
+          <div class="map-title">Карта помещения</div>
+          <div class="map-subtitle">Ультразвуковой радар · Frankenstein 1.0</div>
+        </div>
+        <div class="live-badge">LIVE</div>
+      </div>
+
+      <div class="sonar-wrap">
+        <canvas id="sonar"></canvas>
+      </div>
+
+      <div class="map-legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#00d2ff"></div>
+          Текущий скан
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#ff3b5c"></div>
+          Препятствие
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:rgba(0,229,160,0.6)"></div>
+          Свободно
+        </div>
+      </div>
+    </div>
+
+    <div class="map-info">
+      <div class="sensor-row">
+        <span class="sr-label">📡 Ультразвук (HC-SR04)</span>
+        <span class="sr-val" id="us-dist">—  cm</span>
+      </div>
+      <div class="sensor-row">
+        <span class="sr-label">🔄 Угол сканирования</span>
+        <span class="sr-val" id="us-angle">—°</span>
+      </div>
+      <div class="sensor-row">
+        <span class="sr-label">📐 Радиус обзора</span>
+        <span class="sr-val">400 cm</span>
+      </div>
+      <div class="sensor-row">
+        <span class="sr-label">⚡ Обновление</span>
+        <span class="sr-val">100 ms</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+/* ─── DRAWER ─── */
+function openDrawer()  { document.getElementById('drawer').classList.add('open'); document.getElementById('overlay').classList.add('open'); }
+function closeDrawer() { document.getElementById('drawer').classList.remove('open'); document.getElementById('overlay').classList.remove('open'); }
+
+/* ─── PAGES ─── */
+const pageTitles = { home: 'AIRO Assistant', sensors: 'Датчики безопасности', map: 'Карта помещения' };
+
+function setPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+  document.getElementById('topbar-title').textContent = pageTitles[id];
+  if (id === 'map') startSonar();
+}
+
+/* ─── SENSOR HELPERS ─── */
+function lvl(v, w, d) { return v >= d ? 'alert' : v >= w ? 'warn' : 'normal'; }
+
+function applyCard(id, value, unit, max, warnT, dangerT) {
+  const l = lvl(value, warnT, dangerT);
+  const labels = { normal:'Норма', warn:'Внимание', alert:'Опасно' };
+  const v = document.getElementById('val-' + id);
+  const b = document.getElementById('bar-' + id);
+  const s = document.getElementById('st-' + id);
+  const c = document.getElementById('card-' + id);
+  if (!v) return;
+  v.textContent = value;
+  v.className = 'scard-value' + (l==='normal' ? '' : ' '+l);
+  b.style.width = Math.min(100, (value/max)*100).toFixed(1) + '%';
+  b.className = 'scard-bar' + (l==='normal' ? '' : ' '+l);
+  s.textContent = labels[l];
+  s.className = 'scard-status' + (l==='normal' ? '' : ' '+l);
+  c.className = 'scard' + (l==='alert' ? ' danger' : '');
+  return l;
+}
+
+async function loadSensors() {
+  try {
+    const r = await fetch('http://192.168.4.1/sensors');
+    const d = await r.json();
+    const l1 = applyCard('mq4',   d.mq4   ?? 80,   'ppm', 1000, 400, 600);
+    const l2 = applyCard('mq135', d.mq135 ?? 420,  'ppm', 2000, 1000, 1500);
+    const l3 = applyCard('temp',  d.temp  ?? 22,   '°C',  60,   35,  45);
+    const l4 = applyCard('hum',   d.hum   ?? 48,   '%',   100,  70,  85);
+    const banner = document.getElementById('alert-banner');
+    banner.className = 'alert-banner' + ([l1,l2,l3,l4].includes('alert') ? ' visible' : '');
+  } catch(e) {
+    // demo mode
+    applyCard('mq4',   Math.round(60 + Math.random()*40),  'ppm', 1000, 400, 600);
+    applyCard('mq135', Math.round(400 + Math.random()*80), 'ppm', 2000,1000,1500);
+    applyCard('temp',  (21 + Math.random()*2).toFixed(1),  '°C',  60,  35, 45);
+    applyCard('hum',   (45 + Math.random()*5).toFixed(1),  '%',   100, 70, 85);
+  }
+  const now = new Date();
+  const el = document.getElementById('last-update');
+  if (el) el.textContent = now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+setInterval(loadSensors, 2000);
+loadSensors();
+
+/* ─── SONAR ─── */
+let sonarRunning = false;
+let sonarAngle = 0;
+let sweepDir = 1;
+const obstacles = [];
+let sonarRAF = null;
+
+function startSonar() {
+  if (sonarRunning) return;
+  sonarRunning = true;
+  const canvas = document.getElementById('sonar');
+  const ctx = canvas.getContext('2d');
+
+  function resize() {
+    const size = canvas.parentElement.offsetWidth;
+    canvas.width = size;
+    canvas.height = size;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  // Seed some fake obstacles for demo
+  if (obstacles.length === 0) {
+    for (let a = 0; a < 360; a += 7 + Math.random()*5) {
+      const dist = 0.35 + Math.random() * 0.55;
+      const noObs = (a > 60 && a < 110) || (a > 220 && a < 260);
+      obstacles.push({ angle: a, dist: noObs ? 1.0 : dist });
+    }
+  }
+
+  let lastFetch = 0;
+
+  function draw(ts) {
+    sonarRAF = requestAnimationFrame(draw);
+    const W = canvas.width, H = canvas.height;
+    const cx = W/2, cy = H/2, R = W/2 - 4;
+
+    // Fetch real data occasionally
+    if (ts - lastFetch > 150) {
+      lastFetch = ts;
+      fetch('http://192.168.4.1/sonar').then(r=>r.json()).then(d=>{
+        if (d.distance !== undefined) {
+          document.getElementById('us-dist').textContent  = d.distance + ' cm';
+          document.getElementById('us-angle').textContent = d.angle + '°';
+          // Update obstacle ring
+          const idx = Math.round(d.angle / (360/obstacles.length));
+          if (idx < obstacles.length && d.distance < 400) {
+            obstacles[idx].dist = d.distance / 400;
+          }
+        }
+      }).catch(()=>{});
+    }
+
+    // Animate sweep
+    sonarAngle += 1.4 * sweepDir;
+    if (sonarAngle >= 360) sweepDir = -1;
+    if (sonarAngle <= 0)   sweepDir = 1;
+
+    document.getElementById('us-angle').textContent = Math.round(sonarAngle) + '°';
+
+    // Clear
+    ctx.clearRect(0, 0, W, H);
+
+    // BG circle
+    const bg = ctx.createRadialGradient(cx,cy,0,cx,cy,R);
+    bg.addColorStop(0, 'rgba(0,20,40,0.95)');
+    bg.addColorStop(1, 'rgba(0,8,20,0.98)');
+    ctx.beginPath();
+    ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.fillStyle = bg;
+    ctx.fill();
+
+    // Range rings
+    for (let i=1; i<=4; i++) {
+      const r = R*(i/4);
+      ctx.beginPath();
+      ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle = 'rgba(0,210,255,0.08)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(0,210,255,0.2)';
+      ctx.font = `${W*0.02}px Space Mono, monospace`;
+      ctx.fillText((i*100)+'cm', cx+r+3, cy-3);
+    }
+
+    // Cross-hairs
+    ctx.beginPath();
+    ctx.moveTo(cx-R,cy); ctx.lineTo(cx+R,cy);
+    ctx.moveTo(cx,cy-R); ctx.lineTo(cx,cy+R);
+    ctx.strokeStyle = 'rgba(0,210,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Sweep trail
+    const sweepRad = (sonarAngle - 90) * Math.PI/180;
+    const trailGrad = ctx.createConicalGradient ? null : null; // fallback
+    for (let t = 0; t < 60; t++) {
+      const alpha = (1 - t/60) * 0.18;
+      const a = sweepRad - (t * 0.025 * sweepDir);
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,R,a,a+0.025);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(0,210,255,${alpha})`;
+      ctx.fill();
+    }
+
+    // Sweep line
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(cx + R * Math.cos(sweepRad), cy + R * Math.sin(sweepRad));
+    ctx.strokeStyle = 'rgba(0,210,255,0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'rgba(0,210,255,0.8)';
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Obstacle dots
+    obstacles.forEach(ob => {
+      const ang = (ob.angle - 90) * Math.PI/180;
+      const r = R * ob.dist;
+      const x = cx + r * Math.cos(ang);
+      const y = cy + r * Math.sin(ang);
+      const isClose = sonarAngle % 360;
+      const diff = Math.abs(((ob.angle - sonarAngle) % 360 + 360) % 360);
+      const bright = diff < 30 ? 1 : 0.3 + 0.7 * Math.exp(-diff/80);
+
+      if (ob.dist < 0.95) {
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,59,92,${bright})`;
+        ctx.shadowBlur = bright * 10;
+        ctx.shadowColor = 'rgba(255,59,92,0.8)';
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    });
+
+    // Robot dot at center
+    ctx.beginPath();
+    ctx.arc(cx,cy,5,0,Math.PI*2);
+    ctx.fillStyle = '#00d2ff';
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = '#00d2ff';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // Clip circle edge
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.beginPath();
+    ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.restore();
+
+    // Sim distance for demo
+    const closest = obstacles.reduce((mn,o) => o.dist < mn.dist ? o : mn, {dist:1,angle:0});
+    document.getElementById('us-dist').textContent = Math.round(closest.dist * 400) + ' cm';
+  }
+
+  draw(0);
+}
+
+// Init sonar if map tab visible
+if (document.getElementById('page-map').classList.contains('active')) startSonar();
+</script>
+</body>
+</html>
