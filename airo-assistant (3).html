@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    :root {
+      --bg:        #0a0a0a;
+      --bg2:       #111111;
+      --bg3:       #161616;
+      --text:      #f5f5f5;
+      --silver:    #b8b8b8;
+      --silver-hi: #e0e0e0;
+      --silver-lo: rgba(180,180,180,0.32);
+      --dim:       rgba(200,200,200,0.28);
+      --dim2:      rgba(200,200,200,0.13);
+      --border:    rgba(255,255,255,0.07);
+      --border2:   rgba(255,255,255,0.13);
+      --chart-grid:rgba(255,255,255,0.04);
+      --green:     #7fff9e;
+      --yellow:    #ffd97a;
+      --red:       #ff6b6b;
+    }
+    [data-theme="light"] {
+      --bg:        #f6f4f1;
+      --bg2:       #eeecea;
+      --bg3:       #e5e3e0;
+      --text:      #111111;
+      --silver:    #555555;
+      --silver-hi: #222222;
+      --silver-lo: rgba(60,60,60,0.35);
+      --dim:       rgba(0,0,0,0.32);
+      --dim2:      rgba(0,0,0,0.13);
+      --border:    rgba(0,0,0,0.08);
+      --border2:   rgba(0,0,0,0.14);
+      --chart-grid:rgba(0,0,0,0.05);
+      --green:     #1a9e47;
+      --yellow:    #b87a00;
+      --red:       #cc2828;
+    }
+
+    html, body { height:100%; touch-action:pan-y; }
+    body {
+      font-family:'Montserrat',sans-serif;
+      background:var(--bg); color:var(--silver);
+      min-height:100vh; overflow-x:hidden;
+      transition:background .3s,color .3s;
+    }
+
+    /* ══════════════════════════════════
+       ПЕРЕХОДНЫЙ ЭКРАН (загрузка при смене темы/языка)
+    ══════════════════════════════════ */
+    #transition-screen {
+      display:none;
+      position:fixed; inset:0; z-index:9999;
+      align-items:center; justify-content:center;
+    }
+    #transition-screen.show { display:flex; }
+
+    .ts-blur {
+      position:absolute; inset:0;
+      background:var(--bg);
+      backdrop-filter:blur(24px);
+      -webkit-backdrop-filter:blur(24px);
+      opacity:0;
+      transition:opacity .25s ease;
+    }
+    #transition-screen.show .ts-blur { opacity:1; }
+
+    .ts-logo {
+      position:relative; z-index:2;
+      display:flex; flex-direction:column;
+      align-items:center; gap:16px;
+      opacity:0; transform:scale(.85);
+      transition:opacity .3s ease, transform .3s ease;
+    }
+    #transition-screen.show .ts-logo { opacity:1; transform:scale(1); }
+
+    .ts-rings {
+      position:relative; width:72px; height:72px;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .ts-ring {
+      position:absolute; border-radius:50%;
+      border:1.5px solid var(--silver-lo);
+    }
+    .ts-ring-1 { width:64px; height:64px; animation:spin1 3s linear infinite; }
+    .ts-ring-2 { width:74px; height:20px; transform:rotate(-22deg); animation:spin2r 2.5s linear infinite; }
+    .ts-ring-3 { width:60px; height:14px; transform:rotate(14deg); animation:spin2 4s linear infinite; }
+    .ts-dot { width:5px; height:5px; border-radius:50%; background:var(--silver-lo); }
+
+    .ts-word {
+      font-family:'Cormorant Garamond',serif;
+      font-size:28px; font-weight:300;
+      letter-spacing:10px; text-indent:10px;
+      color:var(--silver-hi);
+    }
+
+    .ts-bar {
+      width:48px; height:1px;
+      background:var(--border2);
+      position:relative; overflow:hidden;
+    }
+    .ts-bar-fill {
+      position:absolute; top:0; left:-100%; height:100%;
+      background:var(--silver-lo);
+      width:100%;
+      transition:none;
+    }
+    #transition-screen.show .ts-bar-fill {
+      animation:bar-sweep .8s ease forwards .1s;
+    }
+    @keyframes bar-sweep { from{left:-100%} to{left:100%} }
+
+    /* ══════════════════════════════════
+       ЗАСТАВКА
+    ══════════════════════════════════ */
+    #splash {
+      position:fixed; inset:0; background:var(--bg);
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      z-index:1000; cursor:pointer;
+      transition:opacity .55s ease, background .3s;
+    }
+    #splash.hide { opacity:0; pointer-events:none; }
+    .splash-logo {
+      position:relative; width:130px; height:130px;
+      display:flex; align-items:center; justify-content:center;
+      margin-bottom:28px; animation:logo-in .9s ease both;
+    }
+    @keyframes logo-in { from{opacity:0;transform:scale(.82)} to{opacity:1;transform:scale(1)} }
+    .s-ring { position:absolute; border-radius:50%; border:1.5px solid var(--silver-lo); }
+    .s-ring-1 { width:120px; height:120px; animation:spin1 9s linear infinite; }
+    .s-ring-2 { width:132px; height:34px; transform:rotate(-22deg); animation:spin2r 7s linear infinite; }
+    .s-ring-3 { width:112px; height:26px; transform:rotate(14deg); animation:spin2 11s linear infinite; }
+    @keyframes spin1  { to{transform:rotate(360deg)} }
+    @keyframes spin2  { from{transform:rotate(14deg)} to{transform:rotate(374deg)} }
+    @keyframes spin2r { from{transform:rotate(-22deg)} to{transform:rotate(338deg)} }
+    .s-dot { width:6px; height:6px; border-radius:50%; background:var(--silver-lo); }
+    .s-wordmark {
+      font-family:'Cormorant Garamond',serif; font-size:50px; font-weight:300;
+      letter-spacing:18px; text-indent:18px; color:var(--silver-hi);
+      animation:logo-in 1.1s ease both;
+    }
+    .s-sub { font-size:8px; letter-spacing:4px; text-transform:uppercase; color:var(--dim); margin-top:6px; animation:logo-in 1.3s ease both; }
+    .s-hint { position:absolute; bottom:44px; font-size:8px; letter-spacing:3px; text-transform:uppercase; color:var(--dim2); animation:hint 2.2s infinite 1.8s; }
+    @keyframes hint { 0%,100%{opacity:.15} 50%{opacity:.5} }
+
+    /* ══════════════════════════════════
+       ПРИЛОЖЕНИЕ
+    ══════════════════════════════════ */
+    #app { max-width:430px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; opacity:0; transition:opacity .45s ease; }
+    #app.visible { opacity:1; }
+
+    /* ШАПКА */
+    .header {
+      padding:20px 18px 16px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:10; background:var(--bg);
+      backdrop-filter:blur(18px); transition:background .3s,border-color .3s;
+    }
+    .logo-btn { display:flex; align-items:center; gap:11px; cursor:pointer; user-select:none; }
+    .logo-mini { position:relative; width:28px; height:28px; display:flex; align-items:center; justify-content:center; }
+    .lm-ring  { position:absolute; width:26px; height:26px; border-radius:50%; border:1px solid var(--silver-lo); }
+    .lm-orbit { position:absolute; width:32px; height:9px; border-radius:50%; border:1px solid var(--silver-lo); transform:rotate(-20deg); }
+    .lm-dot   { width:3px; height:3px; border-radius:50%; background:var(--silver-lo); }
+    .logo-word { font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:600; letter-spacing:5px; text-indent:5px; color:var(--silver-hi); }
+    .header-right { display:flex; align-items:center; gap:12px; }
+    .live-ind { display:flex; align-items:center; gap:5px; font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+    .live-dot { width:5px; height:5px; border-radius:50%; background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .settings-btn { width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:14px; color:var(--dim); border:1px solid var(--border); border-radius:4px; transition:color .2s,border-color .2s; }
+    .settings-btn:hover { color:var(--silver); border-color:var(--border2); }
+
+    /* ПАНЕЛЬ НАСТРОЕК */
+    .settings-panel {
+      background:var(--bg2); border-bottom:1px solid var(--border);
+      padding:0 18px; max-height:0; overflow:hidden;
+      transition:max-height .35s ease, padding .35s ease, background .3s;
+    }
+    .settings-panel.open { max-height:160px; padding:16px 18px; }
+    .sp-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .sp-label { font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+    .toggle-wrap { display:flex; align-items:center; gap:8px; }
+    .tog-lbl { font-size:9px; color:var(--dim); letter-spacing:1px; }
+    .toggle { width:40px; height:22px; border-radius:11px; background:var(--bg3); border:1px solid var(--border2); position:relative; cursor:pointer; transition:all .3s; }
+    .toggle-knob { position:absolute; top:3px; left:3px; width:14px; height:14px; border-radius:50%; background:var(--silver-lo); transition:transform .3s,background .3s; }
+    [data-theme="light"] .toggle-knob { transform:translateX(18px); background:var(--silver); }
+
+    /* Выбор языка */
+    .lang-row { display:flex; gap:6px; }
+    .lang-btn {
+      flex:1; padding:6px 4px; text-align:center;
+      font-size:9px; letter-spacing:1.5px; text-transform:uppercase;
+      color:var(--dim); border:1px solid var(--border2);
+      cursor:pointer; transition:all .2s; font-family:'Montserrat',sans-serif;
+    }
+    .lang-btn.active { color:var(--silver-hi); border-color:var(--silver); background:var(--bg3); }
+
+    /* ВКЛАДКИ */
+    .tabs { display:flex; border-bottom:1px solid var(--border); background:var(--bg); transition:background .3s,border-color .3s; }
+    .tab { flex:1; padding:12px 4px; text-align:center; font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); cursor:pointer; font-weight:500; border-bottom:1px solid transparent; margin-bottom:-1px; transition:all .2s; user-select:none; }
+    .tab.active { color:var(--silver-hi); border-bottom-color:var(--silver); }
+
+    /* SWIPE — горизонтальный контейнер */
+    .pages-wrap {
+      flex:1; overflow:hidden; position:relative;
+      touch-action:pan-y;
+    }
+    .pages-inner {
+      display:flex; width:400%;
+      transition:transform .32s cubic-bezier(.4,0,.2,1);
+      will-change:transform;
+    }
+    .page {
+      width:25%; flex-shrink:0;
+      padding:20px 18px 60px;
+      overflow-y:auto; min-height:calc(100vh - 120px);
+    }
+
+    /* ОБЩИЕ ЭЛЕМЕНТЫ */
+    .page-hdr { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px; }
+    .section-title { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:400; color:var(--text); letter-spacing:.5px; }
+    .upd-time { font-size:9px; color:var(--dim); letter-spacing:1px; }
+    .divider { height:1px; background:var(--border); margin:20px 0; }
+    .group-title { font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--dim); margin-bottom:12px; margin-top:4px; }
+
+    /* ══════════════════════════════════
+       ОБЗОР — сгруппированные блоки
+    ══════════════════════════════════ */
+    .home-hero { padding:22px 0 20px; border-bottom:1px solid var(--border); margin-bottom:20px; }
+    .eyebrow { font-size:8px; letter-spacing:4px; text-transform:uppercase; color:var(--dim); margin-bottom:10px; }
+    .home-title { font-family:'Cormorant Garamond',serif; font-size:36px; font-weight:300; color:var(--text); letter-spacing:-1px; line-height:1.1; margin-bottom:12px; }
+    .home-title span { color:var(--dim); }
+    .home-desc { font-size:11px; line-height:1.9; color:var(--dim); font-weight:300; }
+    .robot-tag { display:inline-flex; align-items:center; gap:8px; margin-top:14px; padding:6px 12px; border:1px solid var(--border2); font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--silver); }
+    .rtag-dot { width:5px; height:5px; border-radius:50%; background:var(--green); box-shadow:0 0 5px var(--green); }
+
+    /* Группа показателей */
+    .norm-group {
+      background:var(--bg2); border:1px solid var(--border);
+      margin-bottom:12px; overflow:hidden;
+      transition:background .3s, border-color .3s;
+    }
+    .norm-group-header {
+      padding:12px 14px 10px;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .norm-group-name { font-size:9px; letter-spacing:2.5px; text-transform:uppercase; color:var(--silver); }
+    .norm-group-unit { font-size:8px; color:var(--dim); letter-spacing:1px; }
+
+    .norm-levels { display:flex; }
+    .norm-level {
+      flex:1; padding:10px 12px;
+      border-right:1px solid var(--border);
+      position:relative;
+    }
+    .norm-level:last-child { border-right:none; }
+    .nlvl-bar { position:absolute; top:0; left:0; right:0; height:2px; }
+    .nlvl-bar.ok     { background:var(--green); }
+    .nlvl-bar.warn   { background:var(--yellow); }
+    .nlvl-bar.danger { background:var(--red); }
+    .nlvl-range { font-family:'Cormorant Garamond',serif; font-size:14px; font-weight:300; color:var(--text); margin-top:6px; }
+    .nlvl-label { font-size:8px; color:var(--dim); letter-spacing:1px; margin-top:3px; }
+
+    /* Экстренные службы */
+    .emergency-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:12px; }
+    .emg-card { background:var(--bg2); border:1px solid var(--border); padding:13px; transition:background .3s; }
+    .emg-card a { text-decoration:none; display:flex; flex-direction:column; }
+    .emg-num  { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:300; color:var(--text); letter-spacing:-1px; }
+    .emg-name { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); margin-top:3px; }
+
+    /* ══════════════════════════════════
+       ДАТЧИКИ
+    ══════════════════════════════════ */
+    .alert-panel { display:none; border:1px solid rgba(255,107,107,.3); background:rgba(255,107,107,.05); margin-bottom:14px; overflow:hidden; }
+    .alert-panel.visible { display:block; }
+    .alert-msg  { padding:11px 14px; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--red); line-height:1.5; }
+    .alert-calls { border-top:1px solid rgba(255,107,107,.15); display:flex; flex-wrap:wrap; }
+    .call-btn { flex:1; min-width:80px; padding:10px 12px; display:flex; flex-direction:column; cursor:pointer; border-right:1px solid rgba(255,107,107,.1); transition:background .2s; text-decoration:none; }
+    .call-btn:last-child { border-right:none; }
+    .call-btn:hover { background:rgba(255,107,107,.08); }
+    .call-num  { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:600; color:var(--red); }
+    .call-name { font-size:8px; color:var(--dim); letter-spacing:1px; text-transform:uppercase; margin-top:2px; }
+
+    .sensors-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .scard { background:var(--bg2); border:1px solid var(--border); padding:17px 13px; transition:border-color .4s,background .3s; animation:reveal .4s ease both; }
+    .scard.danger { border-color:rgba(255,107,107,.38); }
+    .scard.warn   { border-color:rgba(255,217,122,.28); }
+    .scard-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+    .scard-id  { font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+    .scard-dot { width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 7px var(--green); transition:all .4s; }
+    .scard-dot.warn  { background:var(--yellow); box-shadow:0 0 7px var(--yellow); }
+    .scard-dot.alert { background:var(--red); box-shadow:0 0 7px var(--red); animation:blink .8s infinite; }
+    .scard-value { font-family:'Cormorant Garamond',serif; font-size:34px; font-weight:300; color:var(--text); line-height:1; letter-spacing:-1px; transition:color .4s; }
+    .scard-value.warn  { color:var(--yellow); }
+    .scard-value.alert { color:var(--red); }
+    .scard-unit { font-size:8px; color:var(--dim); letter-spacing:1px; margin-top:3px; }
+    .scard-bar  { height:1px; background:var(--border); margin-top:10px; position:relative; overflow:hidden; }
+    .scard-bar-fill { position:absolute; top:0; left:0; height:100%; background:var(--silver-lo); transition:width .9s cubic-bezier(.4,0,.2,1),background .4s; }
+    .scard-bar-fill.warn  { background:rgba(255,217,122,.5); }
+    .scard-bar-fill.alert { background:rgba(255,107,107,.6); }
+
+    .tips-title { font-size:9px; letter-spacing:3px; text-transform:uppercase; color:var(--dim); margin-bottom:12px; margin-top:22px; }
+    .tip-row { display:flex; gap:12px; align-items:flex-start; padding:11px 0; border-bottom:1px solid var(--border); }
+    .tip-mark { width:4px; height:4px; border-radius:50%; background:var(--silver-lo); flex-shrink:0; margin-top:6px; }
+    .tip-text { font-size:10px; line-height:1.7; color:var(--dim); }
+    .tip-text strong { color:var(--silver); font-weight:500; }
+
+    /* ══════════════════════════════════
+       ГРАФИКИ
+    ══════════════════════════════════ */
+    .chart-card { background:var(--bg2); border:1px solid var(--border); padding:15px 13px; margin-bottom:10px; transition:background .3s,border-color .3s; }
+    .chart-hdr  { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .chart-lbl  { font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); }
+    .chart-cur  { font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:300; color:var(--text); letter-spacing:-.5px; }
+    .chart-status-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .chart-status { font-size:8px; letter-spacing:1.5px; text-transform:uppercase; padding:3px 8px; cursor:pointer; transition:all .2s; user-select:none; }
+    .chart-status.ok     { color:var(--green);  border:1px solid rgba(127,255,158,.25); }
+    .chart-status.warn   { color:var(--yellow); border:1px solid rgba(255,217,122,.25); }
+    .chart-status.danger { color:var(--red);    border:1px solid rgba(255,107,107,.25); animation:blink .8s infinite; }
+    .chart-deriv { font-size:8px; color:var(--dim); margin-left:auto; }
+    .chart-wrap { position:relative; height:60px; }
+    canvas.chart { width:100%; height:60px; display:block; }
+
+    /* Инструкция popup */
+    .instr-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; align-items:flex-end; justify-content:center; }
+    .instr-overlay.show { display:flex; }
+    .instr-box { background:var(--bg2); border:1px solid var(--border2); border-bottom:none; width:100%; max-width:430px; padding:24px 20px 36px; animation:slide-up .3s ease; }
+    @keyframes slide-up { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .instr-close { float:right; font-size:16px; color:var(--dim); cursor:pointer; line-height:1; }
+    .instr-title { font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:400; color:var(--text); margin-bottom:14px; }
+    .instr-step { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+    .instr-n { font-family:'Cormorant Garamond',serif; font-size:20px; color:var(--dim); flex-shrink:0; line-height:1.2; }
+    .instr-t { font-size:10px; line-height:1.7; color:var(--silver); }
+    .instr-t strong { color:var(--text); }
+
+    /* ══════════════════════════════════
+       РАДАР
+    ══════════════════════════════════ */
+    .map-card { background:var(--bg2); border:1px solid var(--border); padding:15px; margin-bottom:10px; transition:background .3s,border-color .3s; }
+    .map-top  { display:flex; justify-content:space-between; align-items:center; margin-bottom:13px; }
+    .map-lbl  { font-size:8px; letter-spacing:2.5px; text-transform:uppercase; color:var(--dim); }
+    .sonar-container { position:relative; width:100%; padding-bottom:100%; }
+    canvas#sonar { position:absolute; inset:0; width:100%; height:100%; }
+    .map-legend { display:flex; gap:16px; margin-top:10px; flex-wrap:wrap; }
+    .legend-item { display:flex; align-items:center; gap:6px; font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); }
+    .legend-line { width:13px; height:1px; }
+    .map-stats { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+    .stat-row  { border:1px solid var(--border); padding:10px 12px; transition:border-color .3s; }
+    .stat-lbl  { font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); margin-bottom:4px; }
+    .stat-val  { font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:300; color:var(--text); letter-spacing:-.5px; }
+
+    @keyframes reveal { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  </style>
+</head>
+<body>
+
+<!-- ПЕРЕХОДНЫЙ ЭКРАН -->
+<div id="transition-screen">
+  <div class="ts-blur"></div>
+  <div class="ts-logo">
+    <div class="ts-rings">
+      <div class="ts-ring ts-ring-1"></div>
+      <div class="ts-ring ts-ring-2"></div>
+      <div class="ts-ring ts-ring-3"></div>
+      <div class="ts-dot"></div>
+    </div>
+    <div class="ts-word">AIRO</div>
+    <div class="ts-bar"><div class="ts-bar-fill"></div></div>
+  </div>
+</div>
+
+<!-- ИНСТРУКЦИЯ POPUP -->
+<div class="instr-overlay" id="instr-overlay" onclick="closeInstr(event)">
+  <div class="instr-box" id="instr-box">
+    <div class="instr-close" onclick="closeInstr()">✕</div>
+    <div class="instr-title" id="instr-title"></div>
+    <div id="instr-steps"></div>
+  </div>
+</div>
+
+<!-- ЗАСТАВКА -->
+<div id="splash" onclick="enterApp()">
+  <div class="splash-logo">
+    <div class="s-ring s-ring-1"></div>
+    <div class="s-ring s-ring-2"></div>
+    <div class="s-ring s-ring-3"></div>
+    <div class="s-dot"></div>
+  </div>
+  <div class="s-wordmark">AIRO</div>
+  <div class="s-sub" id="splash-sub">Домашний страж</div>
+  <div class="s-hint" id="splash-hint">нажмите чтобы войти</div>
+</div>
+
+<!-- ПРИЛОЖЕНИЕ -->
+<div id="app">
+
+  <div class="header">
+    <div class="logo-btn" onclick="goSplash()">
+      <div class="logo-mini"><div class="lm-ring"></div><div class="lm-orbit"></div><div class="lm-dot"></div></div>
+      <div class="logo-word">AIRO</div>
+    </div>
+    <div class="header-right">
+      <div class="live-ind"><div class="live-dot"></div><span data-t="online">Онлайн</span></div>
+      <div class="settings-btn" onclick="toggleSettings()">⚙</div>
+    </div>
+  </div>
+
+  <!-- НАСТРОЙКИ -->
+  <div class="settings-panel" id="settings-panel">
+    <div class="sp-row">
+      <span class="sp-label" data-t="theme">Тема</span>
+      <div class="toggle-wrap">
+        <span class="tog-lbl" id="theme-label">Тёмная</span>
+        <div class="toggle" onclick="toggleTheme()"><div class="toggle-knob"></div></div>
+      </div>
+    </div>
+    <div class="sp-row" style="margin-bottom:0">
+      <span class="sp-label" data-t="language">Язык</span>
+      <div class="lang-row">
+        <div class="lang-btn active" id="lang-ru" onclick="setLang('ru')">RU</div>
+        <div class="lang-btn"        id="lang-en" onclick="setLang('en')">EN</div>
+        <div class="lang-btn"        id="lang-uz" onclick="setLang('uz')">UZ</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ВКЛАДКИ -->
+  <div class="tabs" id="tabs">
+    <div class="tab active" onclick="setPage(0)" data-t="tab_home">Обзор</div>
+    <div class="tab"        onclick="setPage(1)" data-t="tab_sensors">Датчики</div>
+    <div class="tab"        onclick="setPage(2)" data-t="tab_charts">Графики</div>
+    <div class="tab"        onclick="setPage(3)" data-t="tab_map">Радар</div>
+  </div>
+
+  <!-- SWIPE КОНТЕЙНЕР -->
+  <div class="pages-wrap" id="pages-wrap">
+    <div class="pages-inner" id="pages-inner">
+
+      <!-- ОБЗОР -->
+      <div class="page" id="page-home">
+        <div class="home-hero">
+          <div class="eyebrow">AIRO</div>
+          <div class="home-title"><span data-t="home_title1">Умный</span><br><span style="color:var(--dim)" data-t="home_title2">Дом</span><span data-t="home_title3">овой</span></div>
+          <div class="home-desc" data-t="home_desc">Автономный робот-ассистент для мониторинга безопасности помещений в реальном времени.</div>
+          <div class="robot-tag"><div class="rtag-dot"></div><span data-t="device_active">Устройство активно</span></div>
+        </div>
+
+        <!-- Группа: Газы -->
+        <div class="group-title" data-t="group_gas">Газовые датчики</div>
+        <div class="norm-group">
+          <div class="norm-group-header">
+            <span class="norm-group-name">MQ-4 · <span data-t="methane">Метан</span></span>
+            <span class="norm-group-unit">ppm</span>
+          </div>
+          <div class="norm-levels">
+            <div class="norm-level"><div class="nlvl-bar ok"></div><div class="nlvl-range">0–200</div><div class="nlvl-label" data-t="norm">Норма</div></div>
+            <div class="norm-level"><div class="nlvl-bar warn"></div><div class="nlvl-range">200–600</div><div class="nlvl-label" data-t="caution">Внимание</div></div>
+            <div class="norm-level"><div class="nlvl-bar danger"></div><div class="nlvl-range">600+</div><div class="nlvl-label" data-t="danger">Опасно</div></div>
+          </div>
+        </div>
+        <div class="norm-group">
+          <div class="norm-group-header">
+            <span class="norm-group-name">MQ-7 · <span data-t="co">Угарный газ</span></span>
+            <span class="norm-group-unit">ppm</span>
+          </div>
+          <div class="norm-levels">
+            <div class="norm-level"><div class="nlvl-bar ok"></div><div class="nlvl-range">0–50</div><div class="nlvl-label" data-t="norm">Норма</div></div>
+            <div class="norm-level"><div class="nlvl-bar warn"></div><div class="nlvl-range">50–300</div><div class="nlvl-label" data-t="caution">Внимание</div></div>
+            <div class="norm-level"><div class="nlvl-bar danger"></div><div class="nlvl-range">300+</div><div class="nlvl-label" data-t="danger">Опасно</div></div>
+          </div>
+        </div>
+
+        <!-- Группа: Климат -->
+        <div class="group-title" data-t="group_climate">Климат</div>
+        <div class="norm-group">
+          <div class="norm-group-header">
+            <span class="norm-group-name">DHT22 · <span data-t="temperature">Температура</span></span>
+            <span class="norm-group-unit">°C</span>
+          </div>
+          <div class="norm-levels">
+            <div class="norm-level"><div class="nlvl-bar ok"></div><div class="nlvl-range">18–25</div><div class="nlvl-label" data-t="norm">Норма</div></div>
+            <div class="norm-level"><div class="nlvl-bar warn"></div><div class="nlvl-range">25–40</div><div class="nlvl-label" data-t="caution">Внимание</div></div>
+            <div class="norm-level"><div class="nlvl-bar danger"></div><div class="nlvl-range">&lt;5 / &gt;40</div><div class="nlvl-label" data-t="danger">Опасно</div></div>
+          </div>
+        </div>
+        <div class="norm-group">
+          <div class="norm-group-header">
+            <span class="norm-group-name">DHT22 · <span data-t="humidity">Влажность</span></span>
+            <span class="norm-group-unit">%</span>
+          </div>
+          <div class="norm-levels">
+            <div class="norm-level"><div class="nlvl-bar ok"></div><div class="nlvl-range">40–60</div><div class="nlvl-label" data-t="norm">Норма</div></div>
+            <div class="norm-level"><div class="nlvl-bar warn"></div><div class="nlvl-range">60–85</div><div class="nlvl-label" data-t="caution">Внимание</div></div>
+            <div class="norm-level"><div class="nlvl-bar danger"></div><div class="nlvl-range">&gt;85</div><div class="nlvl-label" data-t="danger">Опасно</div></div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Экстренные службы -->
+        <div class="group-title" data-t="emergency_services">Экстренные службы</div>
+        <div class="emergency-grid">
+          <div class="emg-card"><a href="tel:101"><div class="emg-num">101</div><div class="emg-name" data-t="emg_101">МЧС · Пожарные</div></a></div>
+          <div class="emg-card"><a href="tel:103"><div class="emg-num">103</div><div class="emg-name" data-t="emg_103">Скорая помощь</div></a></div>
+          <div class="emg-card"><a href="tel:104"><div class="emg-num">104</div><div class="emg-name" data-t="emg_104">Газовая служба</div></a></div>
+          <div class="emg-card"><a href="tel:112"><div class="emg-num">112</div><div class="emg-name" data-t="emg_112">Единый экстренный</div></a></div>
+        </div>
+      </div>
+
+      <!-- ДАТЧИКИ -->
+      <div class="page" id="page-sensors">
+        <div class="page-hdr">
+          <div class="section-title" data-t="tab_sensors">Датчики</div>
+          <div class="upd-time" id="last-update">—</div>
+        </div>
+        <div class="alert-panel" id="alert-panel">
+          <div class="alert-msg" id="alert-msg"></div>
+          <div class="alert-calls" id="alert-calls"></div>
+        </div>
+        <div class="sensors-grid">
+          <div class="scard" id="card-mq4">
+            <div class="scard-top"><div class="scard-id">MQ-4</div><div class="scard-dot" id="dot-mq4"></div></div>
+            <div class="scard-value" id="val-mq4">—</div><div class="scard-unit">ppm</div>
+            <div class="scard-bar"><div class="scard-bar-fill" id="bar-mq4" style="width:0%"></div></div>
+          </div>
+          <div class="scard" id="card-mq7">
+            <div class="scard-top"><div class="scard-id">MQ-7</div><div class="scard-dot" id="dot-mq7"></div></div>
+            <div class="scard-value" id="val-mq7">—</div><div class="scard-unit">ppm</div>
+            <div class="scard-bar"><div class="scard-bar-fill" id="bar-mq7" style="width:0%"></div></div>
+          </div>
+          <div class="scard" id="card-temp">
+            <div class="scard-top"><div class="scard-id">DHT22</div><div class="scard-dot" id="dot-temp"></div></div>
+            <div class="scard-value" id="val-temp">—</div><div class="scard-unit">°C</div>
+            <div class="scard-bar"><div class="scard-bar-fill" id="bar-temp" style="width:0%"></div></div>
+          </div>
+          <div class="scard" id="card-hum">
+            <div class="scard-top"><div class="scard-id">DHT22</div><div class="scard-dot" id="dot-hum"></div></div>
+            <div class="scard-value" id="val-hum">—</div><div class="scard-unit">%</div>
+            <div class="scard-bar"><div class="scard-bar-fill" id="bar-hum" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="tips-title" data-t="tips_title">Как поддерживать оптимальные условия</div>
+        <div class="tip-row"><div class="tip-mark"></div><div class="tip-text" data-t="tip1"><strong>Проветривайте дважды в день</strong> — утром и вечером по 10–15 минут.</div></div>
+        <div class="tip-row"><div class="tip-mark"></div><div class="tip-text" data-t="tip2"><strong>Проверяйте газовые приборы</strong> — следите за цветом пламени горелки.</div></div>
+        <div class="tip-row"><div class="tip-mark"></div><div class="tip-text" data-t="tip3"><strong>Поддерживайте влажность 40–60%</strong> — увлажнитель или вентиляция.</div></div>
+        <div class="tip-row"><div class="tip-mark"></div><div class="tip-text" data-t="tip4"><strong>Не оставляйте двигатели работать</strong> в закрытом гараже — выделяют CO.</div></div>
+        <div class="tip-row"><div class="tip-mark"></div><div class="tip-text" data-t="tip5"><strong>Проверяйте вентиляцию</strong> — поднесите бумагу к решётке, должна притягиваться.</div></div>
+      </div>
+
+      <!-- ГРАФИКИ -->
+      <div class="page" id="page-charts">
+        <div class="page-hdr"><div class="section-title" data-t="tab_charts">Графики</div><div class="upd-time">24h</div></div>
+        <div class="chart-card">
+          <div class="chart-hdr"><div class="chart-lbl" data-t="methane">Метан</div> <div style="display:flex;gap:6px;align-items:center"><div class="chart-lbl">· ppm</div><div class="chart-cur" id="cur-mq4">—</div></div></div>
+          <div class="chart-status-row"><div class="chart-status ok" id="st-mq4" onclick="showInstr('mq4',this)" data-t="all_good">Всё хорошо</div><div class="chart-deriv" id="deriv-mq4">Δ —</div></div>
+          <div class="chart-wrap"><canvas class="chart" id="ch-mq4"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-hdr"><div class="chart-lbl" data-t="co">Угарный газ</div><div style="display:flex;gap:6px;align-items:center"><div class="chart-lbl">· ppm</div><div class="chart-cur" id="cur-mq7">—</div></div></div>
+          <div class="chart-status-row"><div class="chart-status ok" id="st-mq7" onclick="showInstr('mq7',this)" data-t="all_good">Всё хорошо</div><div class="chart-deriv" id="deriv-mq7">Δ —</div></div>
+          <div class="chart-wrap"><canvas class="chart" id="ch-mq7"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-hdr"><div class="chart-lbl" data-t="temperature">Температура</div><div style="display:flex;gap:6px;align-items:center"><div class="chart-lbl">· °C</div><div class="chart-cur" id="cur-temp">—</div></div></div>
+          <div class="chart-status-row"><div class="chart-status ok" id="st-temp" onclick="showInstr('temp',this)" data-t="all_good">Всё хорошо</div><div class="chart-deriv" id="deriv-temp">Δ —</div></div>
+          <div class="chart-wrap"><canvas class="chart" id="ch-temp"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-hdr"><div class="chart-lbl" data-t="humidity">Влажность</div><div style="display:flex;gap:6px;align-items:center"><div class="chart-lbl">· %</div><div class="chart-cur" id="cur-hum">—</div></div></div>
+          <div class="chart-status-row"><div class="chart-status ok" id="st-hum" onclick="showInstr('hum',this)" data-t="all_good">Всё хорошо</div><div class="chart-deriv" id="deriv-hum">Δ —</div></div>
+          <div class="chart-wrap"><canvas class="chart" id="ch-hum"></canvas></div>
+        </div>
+      </div>
+
+      <!-- РАДАР -->
+      <div class="page" id="page-map">
+        <div class="page-hdr"><div class="section-title" data-t="tab_map">Радар</div><div class="upd-time">HC-SR04</div></div>
+        <div class="map-card">
+          <div class="map-top">
+            <div class="map-lbl" data-t="ultrasonic_scan">Ультразвуковое сканирование</div>
+            <div class="live-ind"><div class="live-dot"></div><span data-t="active">Активен</span></div>
+          </div>
+          <div class="sonar-container"><canvas id="sonar"></canvas></div>
+          <div class="map-legend">
+            <div class="legend-item"><div class="legend-line" style="background:var(--silver-lo)"></div><span data-t="beam">Луч</span></div>
+            <div class="legend-item"><div class="legend-line" style="background:var(--red)"></div><span data-t="obstacle">Препятствие</span></div>
+            <div class="legend-item"><div class="legend-line" style="background:var(--green)"></div><span data-t="clear">Свободно</span></div>
+          </div>
+        </div>
+        <div class="map-stats">
+          <div class="stat-row"><div class="stat-lbl" data-t="distance">Дистанция</div><div class="stat-val" id="us-dist">— см</div></div>
+          <div class="stat-row"><div class="stat-lbl" data-t="angle">Угол</div><div class="stat-val" id="us-angle">—°</div></div>
+          <div class="stat-row"><div class="stat-lbl" data-t="radius">Радиус</div><div class="stat-val">400 <span data-t="cm">см</span></div></div>
+          <div class="stat-row"><div class="stat-lbl" data-t="interval">Интервал</div><div class="stat-val">100 мс</div></div>
+        </div>
+      </div>
+
+    </div><!-- /pages-inner -->
+  </div><!-- /pages-wrap -->
+
+</div><!-- /app -->
+
+<script>
+// ════════════════════════════════════════════
+//  ПЕРЕВОДЫ
+// ════════════════════════════════════════════
+const LANGS = {
+  ru: {
+    online:'Онлайн', theme:'Тема', language:'Язык',
+    tab_home:'Обзор', tab_sensors:'Датчики', tab_charts:'Графики', tab_map:'Радар',
+    home_title1:'Умный', home_title2:'Дом', home_title3:'овой',
+    home_desc:'Автономный робот-ассистент для мониторинга безопасности помещений.',
+    device_active:'Устройство активно',
+    group_gas:'Газовые датчики', group_climate:'Климат',
+    methane:'Метан', co:'Угарный газ', temperature:'Температура', humidity:'Влажность',
+    norm:'Норма', caution:'Внимание', danger:'Опасно',
+    emergency_services:'Экстренные службы',
+    emg_101:'МЧС · Пожарные', emg_103:'Скорая помощь',
+    emg_104:'Газовая служба', emg_112:'Единый экстренный',
+    tips_title:'Как поддерживать оптимальные условия',
+    tip1:'<strong>Проветривайте дважды в день</strong> — утром и вечером по 10–15 минут.',
+    tip2:'<strong>Проверяйте газовые приборы</strong> — следите за цветом пламени горелки.',
+    tip3:'<strong>Поддерживайте влажность 40–60%</strong> — увлажнитель или вентиляция.',
+    tip4:'<strong>Не оставляйте двигатели работать</strong> в закрытом гараже — выделяют CO.',
+    tip5:'<strong>Проверяйте вентиляцию</strong> — поднесите бумагу к решётке.',
+    all_good:'Всё хорошо', caution_status:'Тревожно', danger_status:'Опасно',
+    ultrasonic_scan:'Ультразвуковое сканирование', active:'Активен',
+    beam:'Луч', obstacle:'Препятствие', clear:'Свободно',
+    distance:'Дистанция', angle:'Угол', radius:'Радиус', interval:'Интервал', cm:'см',
+    alert_mq4:'Опасный уровень метана — утечка газа. Позвоните:',
+    alert_mq7:'Опасный уровень угарного газа. Позвоните:',
+    alert_both:'Опасный уровень метана и угарного газа. Позвоните:',
+    theme_dark:'Тёмная', theme_light:'Светлая',
+    splash_sub:'Домашний страж', splash_hint:'нажмите чтобы войти',
+  },
+  en: {
+    online:'Online', theme:'Theme', language:'Language',
+    tab_home:'Overview', tab_sensors:'Sensors', tab_charts:'Charts', tab_map:'Radar',
+    home_title1:'Smart', home_title2:'Home', home_title3:' Guard',
+    home_desc:'Autonomous robot assistant for real-time home safety monitoring.',
+    device_active:'Device active',
+    group_gas:'Gas sensors', group_climate:'Climate',
+    methane:'Methane', co:'Carbon monoxide', temperature:'Temperature', humidity:'Humidity',
+    norm:'Normal', caution:'Caution', danger:'Danger',
+    emergency_services:'Emergency services',
+    emg_101:'Fire department', emg_103:'Ambulance',
+    emg_104:'Gas service', emg_112:'Emergency hotline',
+    tips_title:'How to maintain optimal conditions',
+    tip1:'<strong>Ventilate twice a day</strong> — morning and evening for 10–15 minutes.',
+    tip2:'<strong>Check gas appliances</strong> — monitor the color of burner flame.',
+    tip3:'<strong>Maintain 40–60% humidity</strong> — use a humidifier or ventilation.',
+    tip4:'<strong>Never idle engines</strong> in a closed garage — they emit CO.',
+    tip5:'<strong>Check ventilation</strong> — hold paper to the grille, it should be pulled in.',
+    all_good:'All good', caution_status:'Warning', danger_status:'Danger',
+    ultrasonic_scan:'Ultrasonic scanning', active:'Active',
+    beam:'Beam', obstacle:'Obstacle', clear:'Clear',
+    distance:'Distance', angle:'Angle', radius:'Range', interval:'Interval', cm:'cm',
+    alert_mq4:'Dangerous methane level — gas leak. Call:', alert_mq7:'Dangerous CO level. Call:', alert_both:'Dangerous methane and CO levels. Call:',
+    theme_dark:'Dark', theme_light:'Light',
+    splash_sub:'Home guardian', splash_hint:'tap to enter',
+  },
+  uz: {
+    online:'Onlayn', theme:'Mavzu', language:'Til',
+    tab_home:'Umumiy', tab_sensors:'Sensorlar', tab_charts:'Grafiklar', tab_map:'Radar',
+    home_title1:'Aqlli', home_title2:'Uy', home_title3:' Qoʻriqchi',
+    home_desc:'Xonadonda xavfsizlikni real vaqt rejimida nazorat qiluvchi avtonom robot.',
+    device_active:'Qurilma faol',
+    group_gas:'Gaz sensorlari', group_climate:'Iqlim',
+    methane:'Metan', co:'Karbon oksid', temperature:'Harorat', humidity:'Namlik',
+    norm:'Norma', caution:'Ehtiyot', danger:'Xavfli',
+    emergency_services:'Favqulodda xizmatlar',
+    emg_101:'YoFQurilma vazirligi', emg_103:'Tez yordam',
+    emg_104:'Gaz xizmati', emg_112:'Yagona xizmat',
+    tips_title:'Optimal sharoitni saqlash',
+    tip1:'<strong>Kuniga ikki marta shamollatish</strong> — ertalab va kechqurun 10–15 daqiqa.',
+    tip2:'<strong>Gaz moslamalarini tekshiring</strong> — alanga rangini kuzating.',
+    tip3:'<strong>40–60% namlikni saqlang</strong> — namlashtiruvchi yoki shamollatish.',
+    tip4:'<strong>Yopiq garajda dvigatelni ishlatmang</strong> — CO chiqaradi.',
+    tip5:'<strong>Ventilyatsiyani tekshiring</strong> — qogʻozni panjarasiga tutib, tortishi kerak.',
+    all_good:'Hammasi yaxshi', caution_status:'Ogohlantirish', danger_status:'Xavfli',
+    ultrasonic_scan:'Ultratovush skanerlash', active:'Faol',
+    beam:'Nur', obstacle:'Toʻsiq', clear:'Ochiq',
+    distance:'Masofa', angle:'Burchak', radius:'Diapazon', interval:'Interval', cm:'sm',
+    alert_mq4:'Xavfli metan darajasi — gaz sizishi. Qoʻng\'iring:', alert_mq7:'Xavfli CO darajasi. Qoʻng\'iring:', alert_both:'Xavfli metan va CO darajasi. Qoʻng\'iring:',
+    theme_dark:'Toʻq', theme_light:'Och',
+    splash_sub:'Uy qoʻriqchisi', splash_hint:'kirish uchun bosing',
+  }
+};
+
+let currentLang = localStorage.getItem('airo-lang') || 'ru';
+let isDark = localStorage.getItem('airo-theme') !== 'light';
+
+// ── Применить переводы ──────────────────────────
+function applyLang(lang, animate) {
+  const t = LANGS[lang];
+  if (!t) return;
+
+  const run = () => {
+    document.querySelectorAll('[data-t]').forEach(el => {
+      const key = el.getAttribute('data-t');
+      if (t[key] !== undefined) el.innerHTML = t[key];
+    });
+    document.getElementById('theme-label').textContent = isDark ? t.theme_dark : t.theme_light;
+    document.getElementById('splash-sub').textContent  = t.splash_sub;
+    document.getElementById('splash-hint').textContent = t.splash_hint;
+
+    // Вкладки
+    const tabs = document.querySelectorAll('.tab');
+    const tabKeys = ['tab_home','tab_sensors','tab_charts','tab_map'];
+    tabs.forEach((tab, i) => { tab.textContent = t[tabKeys[i]]; });
+
+    // Кнопки языка
+    ['ru','en','uz'].forEach(l => {
+      document.getElementById('lang-'+l).classList.toggle('active', l === lang);
+    });
+
+    // Обновить статусы графиков
+    ['mq4','mq7','temp','hum'].forEach(id => {
+      const el = document.getElementById('st-'+id);
+      if (!el) return;
+      const cls = el.className;
+      if (cls.includes('danger')) el.textContent = t.danger_status;
+      else if (cls.includes('warn')) el.textContent = t.caution_status;
+      else el.textContent = t.all_good;
+    });
+  };
+
+  if (animate) {
+    showTransition(run);
+  } else {
+    run();
+  }
+}
+
+// ── Переходный экран ────────────────────────────
+function showTransition(callback) {
+  const screen = document.getElementById('transition-screen');
+  screen.classList.add('show');
+  setTimeout(() => {
+    callback && callback();
+  }, 450);
+  setTimeout(() => {
+    screen.classList.remove('show');
+  }, 950);
+}
+
+function setLang(lang) {
+  if (lang === currentLang) return;
+  currentLang = lang;
+  localStorage.setItem('airo-lang', lang);
+  applyLang(lang, true);
+}
+
+// ── Тема ────────────────────────────────────────
+function applyThemeCSS() {
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  const t = LANGS[currentLang];
+  document.getElementById('theme-label').textContent = isDark ? t.theme_dark : t.theme_light;
+}
+
+function toggleTheme() {
+  isDark = !isDark;
+  localStorage.setItem('airo-theme', isDark ? 'dark' : 'light');
+  showTransition(() => {
+    applyThemeCSS();
+    redrawAllCharts();
+  });
+}
+
+// ── Настройки ───────────────────────────────────
+function toggleSettings() {
+  document.getElementById('settings-panel').classList.toggle('open');
+}
+
+// Восстановить при загрузке
+(function() {
+  applyThemeCSS();
+  applyLang(currentLang, false);
+})();
+
+// ════════════════════════════════════════════════
+//  ЗАСТАВКА
+// ════════════════════════════════════════════════
+function enterApp() {
+  document.getElementById('splash').classList.add('hide');
+  setTimeout(() => {
+    document.getElementById('splash').style.display = 'none';
+    document.getElementById('app').classList.add('visible');
+  }, 580);
+}
+
+function goSplash() {
+  document.getElementById('app').classList.remove('visible');
+  const s = document.getElementById('splash');
+  s.style.display = 'flex';
+  setTimeout(() => s.classList.remove('hide'), 10);
+}
+
+// ════════════════════════════════════════════════
+//  ВКЛАДКИ + SWIPE
+// ════════════════════════════════════════════════
+let currentPage = 0;
+const PAGE_COUNT = 4;
+
+function setPage(idx, skipTransition) {
+  currentPage = idx;
+  const inner = document.getElementById('pages-inner');
+  inner.style.transform = `translateX(-${idx * 25}%)`;
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  if (idx === 3) initSonar();
+  if (idx === 2) redrawAllCharts();
+}
+
+// Swipe
+(function() {
+  const wrap = document.getElementById('pages-wrap');
+  let startX = 0, startY = 0, dx = 0, isSwipe = false;
+  const THRESHOLD = 50;
+
+  wrap.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    dx = 0; isSwipe = false;
+  }, { passive: true });
+
+  wrap.addEventListener('touchmove', e => {
+    const mx = e.touches[0].clientX - startX;
+    const my = e.touches[0].clientY - startY;
+    if (!isSwipe && Math.abs(mx) > Math.abs(my) + 5) isSwipe = true;
+    if (isSwipe) dx = mx;
+  }, { passive: true });
+
+  wrap.addEventListener('touchend', () => {
+    if (!isSwipe) return;
+    if (dx < -THRESHOLD && currentPage < PAGE_COUNT - 1) setPage(currentPage + 1);
+    else if (dx > THRESHOLD && currentPage > 0) setPage(currentPage - 1);
+    dx = 0; isSwipe = false;
+  });
+
+  // Мышь (десктоп)
+  wrap.addEventListener('mousedown', e => {
+    startX = e.clientX; dx = 0; isSwipe = false;
+  });
+  wrap.addEventListener('mousemove', e => {
+    if (e.buttons !== 1) return;
+    dx = e.clientX - startX;
+    if (Math.abs(dx) > 5) isSwipe = true;
+  });
+  wrap.addEventListener('mouseup', () => {
+    if (!isSwipe) return;
+    if (dx < -THRESHOLD && currentPage < PAGE_COUNT - 1) setPage(currentPage + 1);
+    else if (dx > THRESHOLD && currentPage > 0) setPage(currentPage - 1);
+    dx = 0; isSwipe = false;
+  });
+})();
+
+// ════════════════════════════════════════════════
+//  ИСТОРИЯ ДАННЫХ
+// ════════════════════════════════════════════════
+const MAX_PTS = 288;
+const history = { mq4:[], mq7:[], temp:[], hum:[] };
+function pushHistory(k, v) {
+  history[k].push({ t: Date.now(), v: parseFloat(v) });
+  if (history[k].length > MAX_PTS) history[k].shift();
+}
+
+// ════════════════════════════════════════════════
+//  АЛЕРТ-ПЛАШКА
+// ════════════════════════════════════════════════
+const CALLS_MQ4  = [{ num:'104', key:'emg_104' },{ num:'101', key:'emg_101' },{ num:'112', key:'emg_112' }];
+const CALLS_MQ7  = [{ num:'103', key:'emg_103' },{ num:'101', key:'emg_101' },{ num:'112', key:'emg_112' }];
+const CALLS_BOTH = [{ num:'104', key:'emg_104' },{ num:'103', key:'emg_103' },{ num:'101', key:'emg_101' },{ num:'112', key:'emg_112' }];
+
+function updateAlertPanel(mq4Alert, mq7Alert) {
+  const panel = document.getElementById('alert-panel');
+  const msgEl = document.getElementById('alert-msg');
+  const callsEl = document.getElementById('alert-calls');
+  const t = LANGS[currentLang];
+
+  if (!mq4Alert && !mq7Alert) { panel.classList.remove('visible'); return; }
+  panel.classList.add('visible');
+
+  let msg, calls;
+  if (mq4Alert && mq7Alert) { msg = t.alert_both; calls = CALLS_BOTH; }
+  else if (mq4Alert)        { msg = t.alert_mq4;  calls = CALLS_MQ4; }
+  else                      { msg = t.alert_mq7;  calls = CALLS_MQ7; }
+
+  msgEl.textContent = msg;
+  callsEl.innerHTML = calls.map(c =>
+    `<a class="call-btn" href="tel:${c.num}">
+      <div class="call-num">${c.num}</div>
+      <div class="call-name">${t[c.key]}</div>
+    </a>`
+  ).join('');
+}
+
+// ════════════════════════════════════════════════
+//  ДАТЧИКИ
+// ════════════════════════════════════════════════
+function lvl(v, w, d) { return v >= d ? 'alert' : v >= w ? 'warn' : 'normal'; }
+
+function applyCard(id, value, max, warnT, dangerT) {
+  const l = lvl(value, warnT, dangerT);
+  document.getElementById('val-'+id).textContent = value;
+  document.getElementById('val-'+id).className   = 'scard-value'+(l==='normal'?'':' '+l);
+  document.getElementById('bar-'+id).style.width = Math.min(100,(value/max)*100).toFixed(1)+'%';
+  document.getElementById('bar-'+id).className   = 'scard-bar-fill'+(l==='normal'?'':' '+l);
+  document.getElementById('dot-'+id).className   = 'scard-dot'+(l==='normal'?'':' '+l);
+  document.getElementById('card-'+id).className  = 'scard'+(l==='alert'?' danger':l==='warn'?' warn':'');
+  return l;
+}
+
+function updateChartStatus(id, level) {
+  const el = document.getElementById('st-'+id);
+  if (!el) return;
+  const t = LANGS[currentLang];
+  const labels = { normal: t.all_good, warn: t.caution_status, alert: t.danger_status };
+  el.textContent = labels[level] || t.all_good;
+  el.className   = 'chart-status'+(level==='normal'?' ok':level==='warn'?' warn':' danger');
+}
+
+async function loadSensors() {
+  let d;
+  try {
+    const r = await fetch('http://192.168.4.1/sensors');
+    d = await r.json();
+  } catch {
+    d = {
+      mq4:  Math.round(60+Math.random()*50),
+      mq7:  Math.round(28+Math.random()*30),
+      temp: parseFloat((20+Math.random()*4).toFixed(1)),
+      hum:  parseFloat((44+Math.random()*8).toFixed(1)),
+    };
+  }
+  ['mq4','mq7','temp','hum'].forEach(k => pushHistory(k, d[k]));
+
+  const l4 = applyCard('mq4',  d.mq4,  1000, 400, 600);
+  const l7 = applyCard('mq7',  d.mq7,   500, 200, 300);
+  const lt = applyCard('temp', d.temp,   60,  35,  45);
+  const lh = applyCard('hum',  d.hum,   100,  70,  85);
+
+  updateAlertPanel(l4==='alert', l7==='alert');
+  updateChartStatus('mq4', l4);
+  updateChartStatus('mq7', l7);
+  updateChartStatus('temp', lt);
+  updateChartStatus('hum',  lh);
+
+  const el = document.getElementById('last-update');
+  if (el) el.textContent = new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+
+  if (currentPage === 2) redrawAllCharts();
+}
+
+setInterval(loadSensors, 2000);
+loadSensors();
+
+// ════════════════════════════════════════════════
+//  ИНСТРУКЦИИ
+// ════════════════════════════════════════════════
+const INSTRUCTIONS = {
+  mq4: {
+    normal: { title_ru:'Метан — норма',         title_en:'Methane — Normal',       title_uz:"Metan — Norma",
+      steps_ru:['Концентрация метана в пределах нормы.','Проветривайте помещение дважды в день.','Периодически проверяйте газовые приборы.'],
+      steps_en:['Methane concentration is within normal range.','Ventilate the room twice a day.','Periodically check gas appliances.'],
+      steps_uz:["Metan konsentratsiyasi normalda.",'Xonani kuniga ikki marta shamollating.',"Gaz moslamalarini muntazam tekshiring."]},
+    warn: { title_ru:'Метан — внимание',         title_en:'Methane — Caution',      title_uz:"Metan — Ehtiyot",
+      steps_ru:['<strong>Откройте окна</strong> — проветрите помещение.','<strong>Выключите газовые приборы</strong>.','Проверьте запах газа. Если есть — выйдите.','Не включайте свет при сильном запахе.','Если не снижается — звоните <strong>104</strong>.'],
+      steps_en:['<strong>Open windows</strong> — ventilate the room.','<strong>Turn off gas appliances</strong>.','Check for gas smell. If present — evacuate.','Do not switch lights on with strong smell.','If level stays — call <strong>104</strong>.'],
+      steps_uz:["<strong>Derazalarni oching</strong> — xonani shamollating.","<strong>Gaz moslamalarini o'chiring</strong>.",'Gaz hidini tekshiring. Bor bo\'lsa — chiqing.',"Kuchli hid bo\'lsa chiroqni yoqmang.",'Pasaymasa — <strong>104</strong> ga qo\'ng\'iring.']},
+    alert: { title_ru:'Метан — ОПАСНО!',          title_en:'Methane — DANGER!',      title_uz:"Metan — XAVFLI!",
+      steps_ru:['<strong>Немедленно покиньте помещение</strong>!','<strong>Не включайте свет</strong> — искра вызовет взрыв.','Не пользуйтесь лифтом — только лестница.','Звоните <strong>104</strong> и <strong>101</strong> с улицы.','Не возвращайтесь до приезда специалистов.'],
+      steps_en:['<strong>Evacuate immediately!</strong>','<strong>Do not turn on lights</strong> — spark may cause explosion.','Use stairs only, not elevator.','Call <strong>104</strong> and <strong>101</strong> from outside.','Do not return until specialists arrive.'],
+      steps_uz:["<strong>Zudlik bilan xonadan chiqing!</strong>","<strong>Chiroqni yoqmang</strong> — uchqun portlash keltirib chiqarishi mumkin.",'Faqat zinapoyadan foydalaning.',"<strong>104</strong> va <strong>101</strong> ga ko'chadan qo'ng'iring.",'Mutaxassislar kelgunga qadar qaytmang.']}
+  },
+  mq7: {
+    normal: { title_ru:'Угарный газ — норма',     title_en:'CO — Normal',            title_uz:"CO — Norma",
+      steps_ru:['Концентрация CO в норме. Воздух безопасен.','Регулярно проверяйте вентиляцию.','Не оставляйте работающий автомобиль в закрытом гараже.'],
+      steps_en:['CO concentration is normal. Air is safe.','Check ventilation regularly.','Never leave a running car in a closed garage.'],
+      steps_uz:["CO konsentratsiyasi normada. Havo xavfsiz.",'Ventilyatsiyani muntazam tekshiring.',"Yopiq garajda ishlaydigan mashinani qoldirmang."]},
+    warn: { title_ru:'Угарный газ — внимание',    title_en:'CO — Caution',           title_uz:"CO — Ehtiyot",
+      steps_ru:['<strong>Проветрите помещение</strong>.','Найдите источник: котёл, колонка, печь.','Выйдите на свежий воздух при головной боли.','Проверьте тягу в дымоходе.'],
+      steps_en:['<strong>Ventilate the room</strong>.','Find the source: boiler, heater, stove.','Go outside if you feel headache or dizziness.','Check flue and ventilation draft.'],
+      steps_uz:["<strong>Xonani shamollating</strong>.",'Manba toping: qozon, suv isitgich, o\'choq.',"Bosh og'risa — toza havoga chiqing.",'Tutun quvurini tekshiring.']},
+    alert: { title_ru:'Угарный газ — ОПАСНО!',    title_en:'CO — DANGER!',           title_uz:"CO — XAVFLI!",
+      steps_ru:['<strong>Срочно покиньте помещение!</strong>','CO не имеет запаха и цвета — действуйте быстро.','Вызовите скорую <strong>103</strong>.','Звоните МЧС <strong>101</strong>.','При потере сознания кем-либо — <strong>112</strong>.'],
+      steps_en:['<strong>Evacuate immediately!</strong>','CO is odorless and colorless — act fast.','Call ambulance <strong>103</strong>.','Call emergency <strong>101</strong>.','If someone loses consciousness — <strong>112</strong>.'],
+      steps_uz:["<strong>Zudlik bilan chiqing!</strong>",'CO hidsiz va rangsiz — tez harakat qiling.',"Tez yordam: <strong>103</strong>.",'Favqulodda xizmat: <strong>101</strong>.',"Kimdir hushini yo'qotsa — <strong>112</strong>."]}
+  },
+  temp: {
+    normal: { title_ru:'Температура — норма',     title_en:'Temperature — Normal',   title_uz:"Harorat — Norma",
+      steps_ru:['Температура в комфортном диапазоне 18–25°C.','Для сна оптимально 18–20°C, для дня 22–24°C.'],
+      steps_en:['Temperature is in comfortable range 18–25°C.','Optimal sleep temp: 18–20°C, daytime: 22–24°C.'],
+      steps_uz:["Harorat qulay diapazon: 18–25°C.",'Uyqu uchun: 18–20°C, kunduz: 22–24°C.']},
+    warn: { title_ru:'Температура — отклонение',  title_en:'Temperature — Warning',  title_uz:"Harorat — Ogohlantirish",
+      steps_ru:['Проверьте отопление или кондиционер.','При жаре — проветрите, используйте вентилятор.','При холоде — проверьте батареи и сквозняки.'],
+      steps_en:['Check heating or air conditioning system.','If too hot — ventilate, use a fan.','If too cold — check radiators and drafts.'],
+      steps_uz:["Isitish yoki konditsionerni tekshiring.",'Issiq bo\'lsa — shamollating, ventilyator ishlating.',"Sovuq bo\'lsa — radiatorlar va tortishni tekshiring."]},
+    alert: { title_ru:'Температура — критическая!', title_en:'Temperature — Critical!', title_uz:"Harorat — Kritik!",
+      steps_ru:['При экстремальной жаре — ищите прохладу, пейте воду.','При экстремальном холоде — проверьте отопление.','При плохом самочувствии — скорая <strong>103</strong>.'],
+      steps_en:['Extreme heat: seek cool place, drink water.','Extreme cold: check heating system urgently.','If feeling unwell — call ambulance <strong>103</strong>.'],
+      steps_uz:["O'ta issiqda: salqin joy toping, suv iching.",'O\'ta sovuqda: isitish tizimini zudlik bilan tekshiring.',"Yomon his qilsangiz — tez yordam <strong>103</strong>."]}
+  },
+  hum: {
+    normal: { title_ru:'Влажность — норма',       title_en:'Humidity — Normal',      title_uz:"Namlik — Norma",
+      steps_ru:['Влажность 40–60% — оптимально для здоровья.','Поддерживайте с помощью увлажнителя или вентиляции.'],
+      steps_en:['Humidity 40–60% — optimal for health.','Maintain with humidifier or ventilation.'],
+      steps_uz:["Namlik 40–60% — salomatlik uchun optimal.",'Namlashtiruvchi yoki ventilyatsiya bilan saqlang.']},
+    warn: { title_ru:'Влажность — внимание',      title_en:'Humidity — Caution',     title_uz:"Namlik — Ehtiyot",
+      steps_ru:['При высокой — включите вентиляцию или осушитель.','При низкой — используйте увлажнитель.','Проверьте наличие плесени в углах.'],
+      steps_en:['Too high — enable ventilation or dehumidifier.','Too low — use a humidifier.','Check for mold in corners and under windows.'],
+      steps_uz:["Yuqori bo'lsa — ventilyatsiya yoki quritgichni yoqing.",'Past bo\'lsa — namlashtiruvchi ishlating.',"Burunchlarda mog'or borligini tekshiring."]},
+    alert: { title_ru:'Влажность — критическая!', title_en:'Humidity — Critical!',   title_uz:"Namlik — Kritik!",
+      steps_ru:['Очень высокая: срочно проветрите, риск плесени.','Очень низкая: увлажняйте воздух немедленно.','Проверьте трубы на протечки.'],
+      steps_en:['Very high: ventilate urgently, mold risk.','Very low: humidify air immediately.','Check pipes for leaks.'],
+      steps_uz:["Juda yuqori: zudlik bilan shamollating, mog'or xavfi.",'Juda past: darhol namlashtiring.',"Quvurlarda sizish borligini tekshiring."]}
+  }
+};
+
+function showInstr(sensor, el) {
+  if (!el) return;
+  const cls = el.className;
+  let status = 'normal';
+  if (cls.includes('danger')) status = 'alert';
+  else if (cls.includes('warn')) status = 'warn';
+
+  const data = INSTRUCTIONS[sensor]?.[status];
+  if (!data) return;
+
+  const titleKey = 'title_' + currentLang;
+  const stepsKey = 'steps_' + currentLang;
+
+  document.getElementById('instr-title').textContent = data[titleKey] || data.title_ru;
+  const steps = data[stepsKey] || data.steps_ru;
+  document.getElementById('instr-steps').innerHTML = steps.map((s, i) =>
+    `<div class="instr-step"><div class="instr-n">${i+1}</div><div class="instr-t">${s}</div></div>`
+  ).join('');
+
+  document.getElementById('instr-overlay').classList.add('show');
+}
+
+function closeInstr(e) {
+  if (!e || e.target === document.getElementById('instr-overlay') || e.target.classList.contains('instr-close')) {
+    document.getElementById('instr-overlay').classList.remove('show');
+  }
+}
+
+// ════════════════════════════════════════════════
+//  ГРАФИКИ
+// ════════════════════════════════════════════════
+function drawChart(canvasId, key, color, curId, derivId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const dpr  = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width  = rect.width * dpr;
+  canvas.height = 60 * dpr;
+  canvas.style.width  = rect.width + 'px';
+  canvas.style.height = '60px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = 60;
+  const pts = history[key];
+  if (pts.length < 2) return;
+
+  const vals = pts.map(p => p.v);
+  const minV = Math.min(...vals), maxV = Math.max(...vals), rng = maxV - minV || 1;
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim();
+  ctx.lineWidth = 1;
+  [0,1,2,3].forEach(i => { ctx.beginPath(); ctx.moveTo(0,(H/3)*i); ctx.lineTo(W,(H/3)*i); ctx.stroke(); });
+
+  ctx.beginPath();
+  pts.forEach((p,i) => {
+    const x=(i/(pts.length-1))*W, y=H-((p.v-minV)/rng)*(H-6)-3;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.stroke();
+
+  const lv=pts[pts.length-1], lx=W-1, ly=H-((lv.v-minV)/rng)*(H-6)-3;
+  ctx.lineTo(lx,H); ctx.lineTo(0,H); ctx.closePath();
+  const m=color.match(/\d+/g);
+  if(m){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,`rgba(${m[0]},${m[1]},${m[2]},0.13)`);
+    g.addColorStop(1,`rgba(${m[0]},${m[1]},${m[2]},0)`);
+    ctx.fillStyle=g; ctx.fill();
+  }
+  ctx.beginPath(); ctx.arc(lx,ly,2.5,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+  document.getElementById(curId).textContent = lv.v;
+
+  if (pts.length >= 3) {
+    const diff = (lv.v - pts[pts.length-3].v).toFixed(2);
+    const el = document.getElementById(derivId);
+    if (el) {
+      el.textContent = `Δ ${diff > 0 ? '+' : ''}${diff}${diff > 0.3 ? ' ↑' : diff < -0.3 ? ' ↓' : ''}`;
+      el.style.color = diff > 0.5 ? 'var(--red)' : diff < -0.5 ? 'var(--green)' : 'var(--dim)';
+    }
+  }
+}
+
+function redrawAllCharts() {
+  drawChart('ch-mq4',  'mq4',  'rgb(255,107,107)', 'cur-mq4',  'deriv-mq4');
+  drawChart('ch-mq7',  'mq7',  'rgb(255,167,80)',  'cur-mq7',  'deriv-mq7');
+  drawChart('ch-temp', 'temp', isDark?'rgb(255,217,122)':'rgb(150,100,0)', 'cur-temp','deriv-temp');
+  drawChart('ch-hum',  'hum',  isDark?'rgb(120,180,255)':'rgb(40,100,180)','cur-hum', 'deriv-hum');
+}
+
+// ════════════════════════════════════════════════
+//  РАДАР
+// ════════════════════════════════════════════════
+let sonarInit = false;
+const sonarPts = [];
+
+function initSonar() {
+  if (sonarInit) return;
+  sonarInit = true;
+  const canvas = document.getElementById('sonar');
+  const ctx = canvas.getContext('2d');
+
+  function resize() { const s=canvas.parentElement.offsetWidth; canvas.width=s; canvas.height=s; }
+  resize(); window.addEventListener('resize', resize);
+
+  for (let a=0; a<360; a+=8+Math.random()*5) {
+    const free=(a>55&&a<105)||(a>225&&a<265);
+    sonarPts.push({ angle:a, dist:free?1.0:0.35+Math.random()*0.55 });
+  }
+
+  let sw=0, sd=1;
+  function draw() {
+    requestAnimationFrame(draw);
+    const W=canvas.width, H=canvas.height, cx=W/2, cy=H/2, R=W/2-2;
+    ctx.clearRect(0,0,W,H);
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2);
+    ctx.fillStyle=isDark?'#0d0d0d':'#eeeae5'; ctx.fill();
+
+    const gc=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
+    for(let i=1;i<=4;i++){ctx.beginPath();ctx.arc(cx,cy,R*(i/4),0,Math.PI*2);ctx.strokeStyle=gc;ctx.lineWidth=1;ctx.stroke();}
+    ctx.beginPath();ctx.moveTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.moveTo(cx,cy-R);ctx.lineTo(cx,cy+R);ctx.strokeStyle=gc;ctx.stroke();
+
+    sw+=1.2*sd; if(sw>=360)sd=-1; if(sw<=0)sd=1;
+    const sr=(sw-90)*Math.PI/180;
+
+    for(let t=0;t<50;t++){
+      const a=sr-t*0.022*sd;
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,a,a+0.022);ctx.closePath();
+      ctx.fillStyle=`rgba(${isDark?'200,200,200':'80,80,80'},${(1-t/50)*(isDark?.1:.06)})`;ctx.fill();
+    }
+
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+R*Math.cos(sr),cy+R*Math.sin(sr));
+    ctx.strokeStyle=isDark?'rgba(200,200,200,0.7)':'rgba(80,80,80,0.7)';
+    ctx.lineWidth=1;ctx.shadowBlur=5;ctx.shadowColor=isDark?'rgba(200,200,200,0.4)':'rgba(80,80,80,0.3)';
+    ctx.stroke();ctx.shadowBlur=0;
+
+    sonarPts.forEach(p=>{
+      if(p.dist>=0.95)return;
+      const ang=(p.angle-90)*Math.PI/180,r=R*p.dist;
+      const x=cx+r*Math.cos(ang),y=cy+r*Math.sin(ang);
+      const b=Math.exp(-Math.abs(((p.angle-sw)%360+360)%360)/60);
+      ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,107,107,${0.2+b*0.8})`;ctx.shadowBlur=b*8;ctx.shadowColor='rgba(255,107,107,0.8)';ctx.fill();ctx.shadowBlur=0;
+    });
+
+    ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);
+    ctx.fillStyle=isDark?'rgba(200,200,200,0.9)':'rgba(80,80,80,0.9)';
+    ctx.shadowBlur=10;ctx.shadowColor=isDark?'rgba(200,200,200,0.7)':'rgba(80,80,80,0.5)';
+    ctx.fill();ctx.shadowBlur=0;
+
+    ctx.save();ctx.globalCompositeOperation='destination-in';
+    ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fillStyle='#fff';ctx.fill();ctx.restore();
+
+    const cl=sonarPts.reduce((mn,p)=>p.dist<mn.dist?p:mn,{dist:1});
+    const t2=LANGS[currentLang];
+    document.getElementById('us-dist').textContent=Math.round(cl.dist*400)+' '+(t2.cm||'см');
+    document.getElementById('us-angle').textContent=Math.round(sw)+'°';
+  }
+  draw();
+}
+</script>
+</body>
+</html>
