@@ -124,64 +124,47 @@ body{
 
 /* ══ ПЯТИУГОЛЬНАЯ НАВИГАЦИЯ ══ */
 .pentagon-nav{
-  position:relative;
-  width:100%;
-  height:130px;
-  flex-shrink:0;
-  background:var(--bg2);
-  border-bottom:1px solid var(--border);
+  position:relative;width:100%;height:130px;flex-shrink:0;
+  background:var(--bg2);border-bottom:1px solid var(--border);
   transition:background .3s,border-color .3s;
+  /* нижние узлы должны быть видны */
+  overflow:visible;
+  margin-bottom:14px;
+  z-index:2;
 }
-.pnav-inner{
-  position:relative;
-  width:100%;height:100%;
+.pnav-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.pnav-edge{stroke-width:0.8;fill:none;transition:stroke .3s}
+.pnav-edge-glow{
+  stroke-width:1.5;fill:none;
+  stroke-dasharray:300;stroke-dashoffset:300;
+  transition:stroke-dashoffset .45s ease;
 }
-/* Узлы пятиугольника: top, right, bottom-right, bottom-left, left */
-/* Расчёт: вписанный пятиугольник, top=10%, правые и левые симметричны */
+.pnav-edge-glow.lit{stroke-dashoffset:0}
+.pnav-inner{position:absolute;inset:0}
 .pnav-btn{
   position:absolute;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:4px;
-  width:68px;
+  gap:3px;width:62px;
   cursor:pointer;user-select:none;
   transform:translate(-50%,-50%);
   transition:opacity .2s;
+  -webkit-tap-highlight-color:transparent;
 }
-.pnav-btn:active{opacity:.6}
-
-/* Позиции пятиугольника */
-/* Обзор — верх-центр */
-.pnav-0{left:50%;top:20%}
-/* Датчики — правее */
-.pnav-1{left:82%;top:44%}
-/* Графики — низ-правее */
-.pnav-2{left:68%;top:84%}
-/* Радар — низ-левее */
-.pnav-3{left:32%;top:84%}
-/* Управление — левее */
-.pnav-4{left:18%;top:44%}
-
-/* Линии между узлами */
-.pnav-lines{position:absolute;inset:0;pointer-events:none}
-
+.pnav-btn:active{opacity:.55}
+/* Координаты точно под SVG viewBox="0 0 100 100" */
+.pnav-0{left:50%;top:14%}
+.pnav-1{left:91%;top:44%}
+.pnav-2{left:74%;top:86%}
+.pnav-3{left:26%;top:86%}
+.pnav-4{left:9%;top:44%}
 .pnav-icon{
-  width:34px;height:34px;border-radius:50%;
-  border:1px solid var(--border2);
-  background:var(--bg3);
-  display:flex;align-items:center;justify-content:center;
-  font-size:14px;
+  width:30px;height:30px;border-radius:50%;
+  border:1px solid var(--border2);background:var(--bg3);
+  display:flex;align-items:center;justify-content:center;font-size:13px;
   transition:border-color .3s,background .3s,box-shadow .3s;
 }
-.pnav-icon.active{
-  border-color:var(--silver);
-  background:var(--bg);
-  box-shadow:0 0 10px var(--silver-lo);
-}
-.pnav-label{
-  font-size:7px;letter-spacing:1.5px;text-transform:uppercase;
-  color:var(--dim);white-space:nowrap;
-  transition:color .3s;
-}
+.pnav-icon.active{border-color:var(--silver);background:var(--bg);box-shadow:0 0 12px var(--silver-lo)}
+.pnav-label{font-size:7px;letter-spacing:1px;text-transform:uppercase;color:var(--dim);white-space:nowrap;transition:color .3s}
 .pnav-btn.active .pnav-label{color:var(--silver-hi)}
 
 /* ══ СТРАНИЦЫ ══ */
@@ -295,6 +278,36 @@ canvas#sonar{position:absolute;inset:0;width:100%;height:100%}
 .stat-row{border:1px solid var(--border);padding:9px 11px;transition:border-color .3s}
 .stat-lbl{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
 .stat-val{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:300;color:var(--text)}
+
+/* ══ БАТАРЕЯ ══ */
+.batt-card{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg2);border:1px solid var(--border);
+  padding:12px 14px;margin-bottom:14px;
+  transition:background .3s,border-color .3s;
+}
+.batt-left{display:flex;flex-direction:column;gap:3px}
+.batt-label{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--dim)}
+.batt-value{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:300;color:var(--text);letter-spacing:-1px}
+.batt-icon-wrap{display:flex;align-items:center;gap:0}
+.batt-icon{
+  width:52px;height:24px;
+  border:1.5px solid var(--border2);border-radius:3px;
+  position:relative;overflow:hidden;
+}
+.batt-tip{
+  width:4px;height:10px;
+  background:var(--border2);border-radius:0 2px 2px 0;
+  flex-shrink:0;
+}
+.batt-level{
+  position:absolute;top:0;left:0;height:100%;
+  background:var(--green);
+  transition:width .8s cubic-bezier(.4,0,.2,1),background .4s;
+  border-radius:2px;
+}
+.batt-level.medium{background:var(--yellow)}
+.batt-level.low{background:var(--red);animation:blink .9s infinite}
 
 /* ══ УПРАВЛЕНИЕ (Вкладка 5) ══ */
 .ctrl-status-bar{
@@ -438,10 +451,19 @@ canvas#sonar{position:absolute;inset:0;width:100%;height:100%}
 
   <!-- ПЯТИУГОЛЬНАЯ НАВИГАЦИЯ -->
   <div class="pentagon-nav">
-    <svg class="pnav-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-      <!-- Линии: 0→1→2→3→4→0 -->
-      <polyline points="50,20 82,44 68,84 32,84 18,44 50,20"
-        fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+    <svg class="pnav-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <!-- Базовые линии -->
+      <line class="pnav-edge" id="eb01" x1="50" y1="14" x2="91" y2="44" stroke="rgba(255,255,255,0.07)"/>
+      <line class="pnav-edge" id="eb12" x1="91" y1="44" x2="74" y2="86" stroke="rgba(255,255,255,0.07)"/>
+      <line class="pnav-edge" id="eb23" x1="74" y1="86" x2="26" y2="86" stroke="rgba(255,255,255,0.07)"/>
+      <line class="pnav-edge" id="eb34" x1="26" y1="86" x2="9"  y2="44" stroke="rgba(255,255,255,0.07)"/>
+      <line class="pnav-edge" id="eb40" x1="9"  y1="44" x2="50" y2="14" stroke="rgba(255,255,255,0.07)"/>
+      <!-- Активные/подсвеченные линии поверх -->
+      <line class="pnav-edge-glow" id="eg01" x1="50" y1="14" x2="91" y2="44" stroke="rgba(180,180,180,0.45)"/>
+      <line class="pnav-edge-glow" id="eg12" x1="91" y1="44" x2="74" y2="86" stroke="rgba(180,180,180,0.45)"/>
+      <line class="pnav-edge-glow" id="eg23" x1="74" y1="86" x2="26" y2="86" stroke="rgba(180,180,180,0.45)"/>
+      <line class="pnav-edge-glow" id="eg34" x1="26" y1="86" x2="9"  y2="44" stroke="rgba(180,180,180,0.45)"/>
+      <line class="pnav-edge-glow" id="eg40" x1="9"  y1="44" x2="50" y2="14" stroke="rgba(180,180,180,0.45)"/>
     </svg>
     <div class="pnav-inner">
       <div class="pnav-btn pnav-0 active" id="pnav-0" onclick="setPage(0)">
@@ -607,6 +629,22 @@ canvas#sonar{position:absolute;inset:0;width:100%;height:100%}
           <div class="ctrl-robot-ip">192.168.4.1</div>
         </div>
 
+        <!-- БАТАРЕЯ -->
+        <div class="batt-card" id="batt-card">
+          <div class="batt-left">
+            <div class="batt-label" data-t="battery">Заряд батареи</div>
+            <div class="batt-value" id="batt-pct">—%</div>
+            <div style="font-size:8px;color:var(--dim);letter-spacing:1px;margin-top:1px" id="batt-status-text">нет данных</div>
+          </div>
+          <div class="batt-icon-wrap">
+            <div class="batt-icon">
+              <div class="batt-level" id="batt-level" style="width:0%"></div>
+            </div>
+            <div class="batt-tip"></div>
+          </div>
+        </div>
+
+
         <!-- Джойстик -->
         <div class="joystick-section">
           <div class="joystick-wrap" id="joystick">
@@ -693,10 +731,11 @@ const LANGS={
     alert_both:'Опасный уровень метана и CO. Позвоните:',
     theme_dark:'Тёмная',theme_light:'Светлая',
     splash_sub:'Домашний страж',splash_hint:'нажмите чтобы войти',
-    ctrl_connecting:'Подключение...',ctrl_ok:'Подключено',ctrl_err:'Недоступен',
+    ctrl_connecting:'Подключение...',ctrl_ok:'Подключено',
+    battery:'Заряд батареи',ctrl_err:'Недоступен',
     forward:'Вперёд',backward:'Назад',left:'Влево',right:'Вправо',stop:'Стоп',
     led_on:'Свет вкл',led_off:'Свет выкл',
-    joystick_label:'Потяните для управления',cmd_log:'Журнал команд',
+    joystick_label:'Потяните для управления',cmd_log:'Журнал команд',battery:'Заряд батареи',
   },
   en:{
     online:'Online',theme:'Theme',language:'Language',
@@ -722,10 +761,11 @@ const LANGS={
     alert_mq4:'Dangerous methane level. Call:',alert_mq7:'Dangerous CO level. Call:',alert_both:'Dangerous methane & CO. Call:',
     theme_dark:'Dark',theme_light:'Light',
     splash_sub:'Home guardian',splash_hint:'tap to enter',
-    ctrl_connecting:'Connecting...',ctrl_ok:'Connected',ctrl_err:'Offline',
+    ctrl_connecting:'Connecting...',ctrl_ok:'Connected',
+    battery:'Battery level',ctrl_err:'Offline',
     forward:'Forward',backward:'Back',left:'Left',right:'Right',stop:'Stop',
     led_on:'Light on',led_off:'Light off',
-    joystick_label:'Drag to control',cmd_log:'Command log',
+    joystick_label:'Drag to control',cmd_log:'Command log',battery:'Battery',
   },
   uz:{
     online:'Onlayn',theme:'Mavzu',language:'Til',
@@ -751,10 +791,11 @@ const LANGS={
     alert_mq4:"Xavfli metan darajasi. Qo'ng'iring:",alert_mq7:"Xavfli CO darajasi. Qo'ng'iring:",alert_both:"Xavfli metan va CO. Qo'ng'iring:",
     theme_dark:"To'q",theme_light:'Och',
     splash_sub:"Uy qo'riqchisi",splash_hint:'kirish uchun bosing',
-    ctrl_connecting:'Ulanmoqda...',ctrl_ok:'Ulandi',ctrl_err:'Mavjud emas',
+    ctrl_connecting:'Ulanmoqda...',ctrl_ok:'Ulandi',
+    battery:'Batareya darajasi',ctrl_err:'Mavjud emas',
     forward:'Oldinga',backward:'Orqaga',left:'Chapga',right:"O'ngga",stop:'Stop',
     led_on:'Chiroq yoq',led_off:"Chiroq o'ch",
-    joystick_label:'Boshqarish uchun torting',cmd_log:'Buyruqlar jurnali',
+    joystick_label:'Boshqarish uchun torting',cmd_log:'Buyruqlar jurnali',battery:'Batareya',
   }
 };
 
@@ -852,24 +893,86 @@ function goSplash(){
 let currentPage=0;
 const PAGE_COUNT=5;
 
+// Рёбра пятиугольника: [от, до] → id суффикс
+const PNAV_EDGES=[['01','12','23','34','40'],['01'],['12'],['23'],['34'],['40']];
+// Карта: при переходе с вкладки A на вкладку B — какое ребро светится
+// Порядок: 0→1→2→3→4→0  (и обратно)
+const EDGE_MAP={
+  '01':'eg01','10':'eg01',
+  '12':'eg12','21':'eg12',
+  '23':'eg23','32':'eg23',
+  '34':'eg34','43':'eg34',
+  '40':'eg40','04':'eg40',
+  // пропуски (перепрыгнул) — ничего не светим
+};
+
 function setPage(idx){
-  currentPage=idx;
-  document.getElementById('pages-inner').style.transform=`translateX(-${idx*20}%)`;
-  for(let i=0;i<PAGE_COUNT;i++){
-    const btn=document.getElementById('pnav-'+i);
-    const icon=document.getElementById('pnav-icon-'+i);
-    btn.classList.toggle('active',i===idx);
-    icon.classList.toggle('active',i===idx);
+  const prev=currentPage;
+  const inner=document.getElementById('pages-inner');
+  
+  // Определяем направление для кругового свайпа
+  const goingForward = (idx - prev + PAGE_COUNT) % PAGE_COUNT <= PAGE_COUNT/2;
+  
+  // Переход через край (4→0 или 0→4): убираем анимацию на мгновение
+  const wrapAround = (prev===PAGE_COUNT-1 && idx===0) || (prev===0 && idx===PAGE_COUNT-1);
+  if(wrapAround){
+    inner.style.transition='none';
+    // Для 4→0: телепортируем контент к нужной позиции без анимации
+    inner.style.transform=`translateX(-${idx*20}%)`;
+    // Форсируем reflow, потом возвращаем анимацию
+    void inner.getBoundingClientRect();
+    setTimeout(()=>{ inner.style.transition=''; },10);
+  } else {
+    inner.style.transform=`translateX(-${idx*20}%)`;
   }
+  
+  currentPage=idx;
+
+  // Иконки
+  for(let i=0;i<PAGE_COUNT;i++){
+    document.getElementById('pnav-'+i).classList.toggle('active',i===idx);
+    document.getElementById('pnav-icon-'+i).classList.toggle('active',i===idx);
+  }
+
+  // SVG линии: гасим все, зажигаем обе линии от активного узла
+  ['eg01','eg12','eg23','eg34','eg40'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.classList.remove('lit');
+  });
+  // Для каждого узла — два ребра: предыдущее и следующее
+  // Узлы: 0-1-2-3-4-0 (кольцо)
+  // Ребро между узлом i и i+1 = eg{i}{i+1}
+  const edges=[['eg40','eg01'],['eg01','eg12'],['eg12','eg23'],['eg23','eg34'],['eg34','eg40']];
+  const activeEdges=edges[idx];
+  activeEdges.forEach(eId=>{
+    const el=document.getElementById(eId);
+    if(el){
+      el.classList.remove('lit');
+      void el.getBoundingClientRect();
+      el.classList.add('lit');
+    }
+  });
+
   if(idx===3)initSonar();
   if(idx===2)redrawAllCharts();
+  if(idx===4)updateBattery();
 }
 
-// Свайп
+// Свайп — круговой (5-я → 0-я и обратно)
 (function(){
   const wrap=document.getElementById('pages-wrap');
   let sx=0,sy=0,dx=0,isSwipe=false;
   const THR=50;
+
+  function swipeNext(){
+    // Круговой: после последней — первая
+    setPage((currentPage+1)%PAGE_COUNT);
+  }
+  function swipePrev(){
+    // Круговой: перед первой — последняя
+    setPage((currentPage-1+PAGE_COUNT)%PAGE_COUNT);
+  }
+
   wrap.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;dx=0;isSwipe=false},{passive:true});
   wrap.addEventListener('touchmove',e=>{
     const mx=e.touches[0].clientX-sx,my=e.touches[0].clientY-sy;
@@ -878,16 +981,16 @@ function setPage(idx){
   },{passive:true});
   wrap.addEventListener('touchend',()=>{
     if(!isSwipe)return;
-    if(dx<-THR&&currentPage<PAGE_COUNT-1)setPage(currentPage+1);
-    else if(dx>THR&&currentPage>0)setPage(currentPage-1);
+    if(dx<-THR)swipeNext();
+    else if(dx>THR)swipePrev();
     dx=0;isSwipe=false;
   });
   wrap.addEventListener('mousedown',e=>{sx=e.clientX;dx=0;isSwipe=false});
   wrap.addEventListener('mousemove',e=>{if(e.buttons!==1)return;dx=e.clientX-sx;if(Math.abs(dx)>5)isSwipe=true});
   wrap.addEventListener('mouseup',()=>{
     if(!isSwipe)return;
-    if(dx<-THR&&currentPage<PAGE_COUNT-1)setPage(currentPage+1);
-    else if(dx>THR&&currentPage>0)setPage(currentPage-1);
+    if(dx<-THR)swipeNext();
+    else if(dx>THR)swipePrev();
     dx=0;isSwipe=false;
   });
 })();
@@ -953,7 +1056,12 @@ function notifyTelegram(msg){
 
 async function loadSensors(){
   let d;
-  try{const r=await fetch('http://192.168.4.1/sensors',{signal:AbortSignal.timeout(2000)});d=await r.json()}
+  try{
+    const r=await fetch('http://192.168.4.1/sensors',{signal:AbortSignal.timeout(2000)});
+    d=await r.json();
+    // Если ESP возвращает заряд батареи
+    if(d.batt!==undefined) updateBatteryValue(d.batt);
+  }
   catch{d={mq4:Math.round(60+Math.random()*50),mq7:Math.round(28+Math.random()*30),temp:parseFloat((20+Math.random()*4).toFixed(1)),hum:parseFloat((44+Math.random()*8).toFixed(1))}}
   ['mq4','mq7','temp','hum'].forEach(k=>pushHistory(k,d[k]));
   const l4=applyCard('mq4',d.mq4,1000,400,600);
@@ -1203,6 +1311,39 @@ function btnRelease(){
   joy.addEventListener('mouseup',()=>{active=false;resetKnob()});
   joy.addEventListener('mouseleave',()=>{if(active){active=false;resetKnob()}});
 })();
+
+// ════════════════════════════════════════
+//  БАТАРЕЯ
+// ════════════════════════════════════════
+// Применить значение заряда в UI
+function updateBatteryValue(pct){
+  const pctEl=document.getElementById('batt-pct');
+  const lvlEl=document.getElementById('batt-level');
+  const stEl =document.getElementById('batt-status-text');
+  if(!pctEl||!lvlEl)return;
+  const p=Math.min(100,Math.max(0,Math.round(pct)));
+  pctEl.textContent=p+'%';
+  pctEl.style.color=p<=20?'var(--red)':p<=50?'var(--yellow)':'var(--text)';
+  lvlEl.style.width=p+'%';
+  lvlEl.className='batt-level'+(p<=20?' low':p<=50?' medium':'');
+  if(stEl){
+    stEl.textContent=p<=20?'Критически низкий':p<=50?'Средний':'Достаточный';
+    stEl.style.color=p<=20?'var(--red)':p<=50?'var(--yellow)':'var(--green)';
+  }
+}
+
+async function updateBattery(){
+  let pct=null;
+  try{
+    const r=await fetch('http://192.168.4.1/battery',{signal:AbortSignal.timeout(1500)});
+    const d=await r.json();
+    pct=d.pct??d.battery??d.v??null;
+  }catch{
+    // fallback — демо значение пока нет реального датчика
+    pct=Math.round(55+Math.random()*30);
+  }
+  if(pct!==null) updateBatteryValue(pct);
+}
 
 // Проверка подключения к роботу каждые 5 сек
 setInterval(async()=>{
